@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        TAG=${GITHUB_REF#refs/tags/v}
+        echo "version=$TAG" >> $GITHUB_OUTPUT
+        echo "Version: $TAG"
+
+    - name: Update version in Directory.Build.props
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if [[ $VERSION == *"-"* ]]; then
+          # Pre-release version (e.g., 1.0.0-beta.1)
+          VERSION_PREFIX="${VERSION%%-*}"
+          VERSION_SUFFIX="${VERSION#*-}"
+          sed -i "s|<VersionPrefix>.*</VersionPrefix>|<VersionPrefix>$VERSION_PREFIX</VersionPrefix>|" Directory.Build.props
+          sed -i "s|<VersionSuffix>.*</VersionSuffix>|<VersionSuffix>$VERSION_SUFFIX</VersionSuffix>|" Directory.Build.props
+        else
+          # Release version (e.g., 1.0.0)
+          sed -i "s|<VersionPrefix>.*</VersionPrefix>|<VersionPrefix>$VERSION</VersionPrefix>|" Directory.Build.props
+          sed -i "s|<VersionSuffix>.*</VersionSuffix>|<VersionSuffix></VersionSuffix>|" Directory.Build.props
+        fi
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal
+
+    - name: Pack
+      run: dotnet pack src/ThrowsAnalyzer/ThrowsAnalyzer.csproj --configuration Release --no-build --output ./artifacts
+
+    - name: List artifacts
+      run: ls -la ./artifacts
+
+    - name: Push to NuGet
+      if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      continue-on-error: false
+
+    - name: Push to NuGet (Pre-release)
+      if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-')
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      continue-on-error: false
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./artifacts/*.nupkg
+        generate_release_notes: true
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Summary
+      run: |
+        echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "📦 Version: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ NuGet package published" >> $GITHUB_STEP_SUMMARY
+        echo "✅ GitHub release created" >> $GITHUB_STEP_SUMMARY

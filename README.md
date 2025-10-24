@@ -1,5 +1,10 @@
 # ThrowsAnalyzer
 
+[![CI](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer)
+[![License](https://img.shields.io/github/license/wieslawsoltes/ThrowsAnalyzer.svg)](LICENSE)
+
 A Roslyn-based C# analyzer that detects exception handling patterns in your code. ThrowsAnalyzer helps identify throw statements, unhandled exceptions, and try-catch blocks across all executable member types.
 
 ## Features
