@@ -10,7 +10,15 @@ public static class AnalyzerTestHelper
     public static async Task<Diagnostic[]> GetDiagnosticsAsync<TAnalyzer>(string source)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
-        var project = CreateProject(source);
+        return await GetDiagnosticsAsync<TAnalyzer>(source, null);
+    }
+
+    public static async Task<Diagnostic[]> GetDiagnosticsAsync<TAnalyzer>(
+        string source,
+        Dictionary<string, string>? editorConfigOptions)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        var project = CreateProject(source, editorConfigOptions);
         var compilation = await project.GetCompilationAsync();
 
         if (compilation == null)
@@ -19,13 +27,31 @@ public static class AnalyzerTestHelper
         }
 
         var analyzer = new TAnalyzer();
-        var compilationWithAnalyzers = compilation.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer));
+
+        // Create analyzer options with custom config provider if specified
+        var analyzerOptions = editorConfigOptions != null
+            ? new CompilationWithAnalyzersOptions(
+                options: new AnalyzerOptions(
+                    additionalFiles: ImmutableArray<AdditionalText>.Empty,
+                    optionsProvider: new TestAnalyzerConfigOptionsProvider(editorConfigOptions)),
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false)
+            : new CompilationWithAnalyzersOptions(
+                options: null,
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false);
+
+        var compilationWithAnalyzers = compilation.WithAnalyzers(
+            ImmutableArray.Create<DiagnosticAnalyzer>(analyzer),
+            analyzerOptions);
 
         var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
         return diagnostics.ToArray();
     }
 
-    private static Project CreateProject(string source)
+    private static Project CreateProject(string source, Dictionary<string, string>? editorConfigOptions)
     {
         var projectId = ProjectId.CreateNewId();
         var documentId = DocumentId.CreateNewId(projectId);
