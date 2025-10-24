@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
@@ -43,7 +41,7 @@ public class SampleAnalyzer : DiagnosticAnalyzer
     {
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
 
-        if (HasThrowStatements(methodDeclaration))
+        if (MethodThrowAnalyzer.HasThrowStatements(methodDeclaration))
         {
             var diagnostic = Diagnostic.Create(
                 Rule,
@@ -52,39 +50,6 @@ public class SampleAnalyzer : DiagnosticAnalyzer
 
             context.ReportDiagnostic(diagnostic);
         }
-    }
-
-    private static bool HasThrowStatements(MethodDeclarationSyntax methodDeclaration)
-    {
-        var nodesToCheck = GetNodesToAnalyze(methodDeclaration);
-
-        foreach (var node in nodesToCheck)
-        {
-            if (ContainsThrowSyntax(node))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static IEnumerable<SyntaxNode> GetNodesToAnalyze(MethodDeclarationSyntax methodDeclaration)
-    {
-        if (methodDeclaration.Body != null)
-        {
-            yield return methodDeclaration.Body;
-        }
-
-        if (methodDeclaration.ExpressionBody != null)
-        {
-            yield return methodDeclaration.ExpressionBody;
-        }
-    }
-
-    private static bool ContainsThrowSyntax(SyntaxNode node)
-    {
-        return node.DescendantNodes().Any(n => n is ThrowStatementSyntax or ThrowExpressionSyntax);
     }
 }
 }
