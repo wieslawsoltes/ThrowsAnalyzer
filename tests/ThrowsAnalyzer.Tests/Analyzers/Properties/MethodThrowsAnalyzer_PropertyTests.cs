@@ -1,19 +1,19 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace ThrowsAnalyzer.Tests;
+namespace ThrowsAnalyzer.Tests.Analyzers.Properties;
 
 [TestClass]
-public class MethodThrowsAnalyzerTests
+public class MethodThrowsAnalyzer_PropertyTests
 {
     [TestMethod]
-    public async Task MethodWithThrowStatement_ShouldReportDiagnostic()
+    public async Task PropertyGetterWithThrow_ShouldReportDiagnostic()
     {
         var testCode = """
             class TestClass
             {
-                void ThrowingMethod()
+                public string Name
                 {
-                    throw new System.Exception("Error");
+                    get { throw new System.NotImplementedException(); }
                 }
             }
             """;
@@ -22,64 +22,62 @@ public class MethodThrowsAnalyzerTests
 
         Assert.AreEqual(1, diagnostics.Length);
         Assert.AreEqual("THROWS001", diagnostics[0].Id);
-        Assert.IsTrue(diagnostics[0].GetMessage().Contains("ThrowingMethod"));
     }
 
     [TestMethod]
-    public async Task MethodWithoutThrowStatement_ShouldNotReportDiagnostic()
+    public async Task PropertySetterWithThrow_ShouldReportDiagnostic()
     {
         var testCode = """
             class TestClass
             {
-                void SafeMethod()
+                private string _name;
+                public string Name
                 {
-                    var x = 42;
+                    get => _name;
+                    set
+                    {
+                        if (string.IsNullOrEmpty(value))
+                            throw new System.ArgumentException("Name cannot be empty");
+                        _name = value;
+                    }
                 }
+            }
+            """;
+
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
+
+        Assert.AreEqual(1, diagnostics.Length);
+        Assert.AreEqual("THROWS001", diagnostics[0].Id);
+    }
+
+    [TestMethod]
+    public async Task PropertyWithExpressionBodyThrow_ShouldReportDiagnostic()
+    {
+        var testCode = """
+            class TestClass
+            {
+                public string Name => throw new System.NotImplementedException();
+            }
+            """;
+
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
+
+        Assert.AreEqual(1, diagnostics.Length);
+        Assert.AreEqual("THROWS001", diagnostics[0].Id);
+    }
+
+    [TestMethod]
+    public async Task AutoPropertyWithoutThrow_ShouldNotReportDiagnostic()
+    {
+        var testCode = """
+            class TestClass
+            {
+                public string Name { get; set; }
             }
             """;
 
         var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
 
         Assert.AreEqual(0, diagnostics.Length);
-    }
-
-    [TestMethod]
-    public async Task MethodWithThrowExpression_ShouldReportDiagnostic()
-    {
-        var testCode = """
-            class TestClass
-            {
-                int ThrowingProperty() => throw new System.Exception("Error");
-            }
-            """;
-
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
-
-        Assert.AreEqual(1, diagnostics.Length);
-        Assert.AreEqual("THROWS001", diagnostics[0].Id);
-        Assert.IsTrue(diagnostics[0].GetMessage().Contains("ThrowingProperty"));
-    }
-
-    [TestMethod]
-    public async Task MethodWithMultipleThrows_ShouldReportOneDiagnostic()
-    {
-        var testCode = """
-            class TestClass
-            {
-                void MultipleThrows(int x)
-                {
-                    if (x < 0)
-                        throw new System.ArgumentException("Negative");
-                    if (x > 100)
-                        throw new System.ArgumentException("Too large");
-                }
-            }
-            """;
-
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
-
-        Assert.AreEqual(1, diagnostics.Length);
-        Assert.AreEqual("THROWS001", diagnostics[0].Id);
-        Assert.IsTrue(diagnostics[0].GetMessage().Contains("MultipleThrows"));
     }
 }

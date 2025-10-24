@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using ThrowsAnalyzer.Core;
 
 namespace ThrowsAnalyzer
 {
@@ -18,20 +19,31 @@ public class MethodThrowsAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
 
-        // Register syntax node action for method declarations
-        context.RegisterSyntaxNodeAction(AnalyzeMethodDeclaration, SyntaxKind.MethodDeclaration);
+        // Register for all executable member types
+        context.RegisterSyntaxNodeAction(AnalyzeExecutableMember,
+            AnalyzerConfiguration.ExecutableMemberSyntaxKinds);
     }
 
-    private static void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeExecutableMember(SyntaxNodeAnalysisContext context)
     {
-        var methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        var node = context.Node;
 
-        if (ThrowStatementDetector.HasThrowStatements(methodDeclaration))
+        // Use generic detector
+        if (!ExecutableMemberHelper.IsExecutableMember(node))
         {
+            return;
+        }
+
+        if (ThrowStatementDetector.HasThrowStatements(node))
+        {
+            // Get appropriate location and name based on member type
+            var location = AnalyzerHelper.GetMemberLocation(node);
+            var memberName = ExecutableMemberHelper.GetMemberDisplayName(node);
+
             var diagnostic = Diagnostic.Create(
                 MethodThrowsDiagnosticsBuilder.MethodContainsThrowStatement,
-                methodDeclaration.Identifier.GetLocation(),
-                methodDeclaration.Identifier.Text);
+                location,
+                memberName);
 
             context.ReportDiagnostic(diagnostic);
         }

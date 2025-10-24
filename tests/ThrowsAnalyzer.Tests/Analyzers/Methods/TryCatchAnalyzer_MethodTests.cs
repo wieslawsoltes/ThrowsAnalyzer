@@ -1,9 +1,9 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace ThrowsAnalyzer.Tests;
+namespace ThrowsAnalyzer.Tests.Analyzers.Methods;
 
 [TestClass]
-public class TryCatchAnalyzerTests
+public class TryCatchAnalyzer_MethodTests
 {
     [TestMethod]
     public async Task MethodWithTryCatch_ShouldReportDiagnostic()

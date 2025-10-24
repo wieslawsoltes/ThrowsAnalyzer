@@ -1,9 +1,9 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace ThrowsAnalyzer.Tests;
+namespace ThrowsAnalyzer.Tests.Analyzers.Methods;
 
 [TestClass]
-public class UnhandledThrowsAnalyzerTests
+public class UnhandledThrowsAnalyzer_MethodTests
 {
     [TestMethod]
     public async Task MethodWithUnhandledThrow_ShouldReportDiagnostic()
@@ -103,7 +103,7 @@ public class UnhandledThrowsAnalyzerTests
         var testCode = """
             class TestClass
             {
-                int ThrowingProperty() => throw new System.Exception("Error");
+                int ThrowingMethod() => throw new System.Exception("Error");
             }
             """;
 
