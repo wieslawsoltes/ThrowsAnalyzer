@@ -16,7 +16,9 @@
       "WebSearch",
       "Bash(dotnet test:*)",
       "Bash(dotnet pack:*)",
-      "Bash(unzip:*)"
+      "Bash(unzip:*)",
+      "Bash(dotnet clean:*)",
+      "Bash(/dev/null)"
     ],
     "deny": [],
     "ask": []
