@@ -6,6 +6,24 @@ root = true
 [*.cs]
 
 # ========================================
+# Analyzer Enable/Disable Configuration
+# ========================================
+# Control whether each analyzer is completely enabled or disabled
+# Options: true, false
+# Default: true (all analyzers enabled)
+# Note: Setting to false completely disables the analyzer regardless of severity settings
+
+# Enable/disable throw statement analyzer (THROWS001)
+throws_analyzer_enable_throw_statement = true
+
+# Enable/disable unhandled throw analyzer (THROWS002)
+throws_analyzer_enable_unhandled_throw = true
+
+# Enable/disable try-catch block analyzer (THROWS003)
+throws_analyzer_enable_try_catch = true
+
+
+# ========================================
 # Analyzer Rule Severity Configuration
 # ========================================
 # Control the severity of each analyzer rule
@@ -77,9 +95,10 @@ throws_analyzer_analyze_anonymous_methods = true
 
 
 # ========================================
-# Example: Focus on Unhandled Exceptions
+# Example: Focus on Unhandled Exceptions Only
 # ========================================
 # Uncomment to focus only on unhandled throws:
-# dotnet_diagnostic.THROWS001.severity = none
+# throws_analyzer_enable_throw_statement = false
+# throws_analyzer_enable_unhandled_throw = true
+# throws_analyzer_enable_try_catch = false
 # dotnet_diagnostic.THROWS002.severity = error
-# dotnet_diagnostic.THROWS003.severity = none

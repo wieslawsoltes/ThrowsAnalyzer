@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ThrowsAnalyzer.Configuration
 {
@@ -11,6 +10,23 @@ namespace ThrowsAnalyzer.Configuration
     public static class AnalyzerOptionsReader
     {
         private const string OptionPrefix = "throws_analyzer";
+
+        /// <summary>
+        /// Checks if a specific analyzer is enabled
+        /// </summary>
+        public static bool IsAnalyzerEnabled(AnalyzerOptions options, SyntaxTree tree, string analyzerName)
+        {
+            var key = $"{OptionPrefix}_enable_{analyzerName}";
+            var provider = options.AnalyzerConfigOptionsProvider.GetOptions(tree);
+
+            if (provider.TryGetValue(key, out var value))
+            {
+                return value.Trim().ToLowerInvariant() == "true";
+            }
+
+            // Default: all analyzers enabled
+            return true;
+        }
 
         /// <summary>
         /// Checks if a specific member type should be analyzed

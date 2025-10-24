@@ -29,6 +29,12 @@ public class TryCatchAnalyzer : DiagnosticAnalyzer
     {
         var node = context.Node;
 
+        // Check if this analyzer is enabled
+        if (!AnalyzerOptionsReader.IsAnalyzerEnabled(context.Options, context.Node.SyntaxTree, "try_catch"))
+        {
+            return;
+        }
+
         // Check if this member type is enabled in configuration
         var memberTypeKey = AnalyzerOptionsReader.GetMemberTypeKey(node.Kind());
         if (!AnalyzerOptionsReader.IsMemberTypeEnabled(context.Options, context.Node.SyntaxTree, memberTypeKey))

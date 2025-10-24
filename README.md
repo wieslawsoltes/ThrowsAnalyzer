@@ -35,7 +35,26 @@ Once installed, the analyzer runs automatically during compilation. Diagnostics 
 
 ## Configuration
 
-ThrowsAnalyzer provides granular configuration options through `.editorconfig` files. You can control both analyzer severity and which member types to analyze.
+ThrowsAnalyzer provides granular configuration options through `.editorconfig` files. You can control analyzer enablement, severity, and which member types to analyze.
+
+### Enabling/Disabling Individual Analyzers
+
+Control whether each analyzer is completely enabled or disabled:
+
+```ini
+[*.cs]
+
+# Enable/disable throw statement analyzer (THROWS001)
+throws_analyzer_enable_throw_statement = true
+
+# Enable/disable unhandled throw analyzer (THROWS002)
+throws_analyzer_enable_unhandled_throw = true
+
+# Enable/disable try-catch block analyzer (THROWS003)
+throws_analyzer_enable_try_catch = true
+```
+
+All analyzers are enabled by default. Setting an option to `false` completely disables that analyzer, regardless of severity settings.
 
 ### Configuring Analyzer Severity
 
@@ -118,9 +137,10 @@ throws_analyzer_analyze_anonymous_methods = false
 
 ```ini
 [*.cs]
-dotnet_diagnostic.THROWS001.severity = none
+throws_analyzer_enable_throw_statement = false
+throws_analyzer_enable_unhandled_throw = true
+throws_analyzer_enable_try_catch = false
 dotnet_diagnostic.THROWS002.severity = error
-dotnet_diagnostic.THROWS003.severity = none
 ```
 
 #### Disable Analysis for Lambdas and Local Functions
