@@ -12,7 +12,8 @@
       "Bash(git commit:*)",
       "Bash(git log:*)",
       "Bash(git restore:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
