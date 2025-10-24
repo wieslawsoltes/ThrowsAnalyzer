@@ -69,7 +69,7 @@ Control the severity of each diagnostic rule:
 [*.cs]
 
 # THROWS001: Detects throw statements in members
-dotnet_diagnostic.THROWS001.severity = warning
+dotnet_diagnostic.THROWS001.severity = suggestion
 
 # THROWS002: Detects unhandled throw statements (not wrapped in try-catch)
 dotnet_diagnostic.THROWS002.severity = warning
