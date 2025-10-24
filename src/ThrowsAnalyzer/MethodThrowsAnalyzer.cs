@@ -26,7 +26,7 @@ public class MethodThrowsAnalyzer : DiagnosticAnalyzer
     {
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
 
-        if (MethodThrowAnalyzer.HasThrowStatements(methodDeclaration))
+        if (ThrowStatementDetector.HasThrowStatements(methodDeclaration))
         {
             var diagnostic = Diagnostic.Create(
                 MethodThrowsDiagnosticsBuilder.MethodContainsThrowStatement,

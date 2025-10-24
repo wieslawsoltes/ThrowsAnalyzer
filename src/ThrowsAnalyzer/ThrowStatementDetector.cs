@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ThrowsAnalyzer
 {
-    public static class MethodThrowAnalyzer
+    public static class ThrowStatementDetector
     {
         public static bool HasThrowStatements(MethodDeclarationSyntax methodDeclaration)
         {
