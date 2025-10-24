@@ -17,7 +17,7 @@ namespace ThrowsAnalyzer
             Title001,
             MessageFormat001,
             Category,
-            DiagnosticSeverity.Warning,
+            DiagnosticSeverity.Info,
             isEnabledByDefault: true,
             description: Description001);
 

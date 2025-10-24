@@ -4,6 +4,6 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-THROWS001 | Usage | Warning | MethodContainsThrowStatement
+THROWS001 | Usage | Info | MethodContainsThrowStatement
 THROWS002 | Usage | Warning | MethodContainsUnhandledThrow
 THROWS003 | Usage | Info | MethodContainsTryCatch

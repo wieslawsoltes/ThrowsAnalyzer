@@ -28,10 +28,10 @@ throws_analyzer_enable_try_catch = true
 # ========================================
 # Control the severity of each analyzer rule
 # Options: none, silent, suggestion, warning, error
-# Default: warning for THROWS001 and THROWS002, info for THROWS003
+# Default: suggestion for THROWS001 and THROWS003, warning for THROWS002
 
 # THROWS001: Detects throw statements in members
-dotnet_diagnostic.THROWS001.severity = warning
+dotnet_diagnostic.THROWS001.severity = suggestion
 
 # THROWS002: Detects unhandled throw statements (not wrapped in try-catch)
 dotnet_diagnostic.THROWS002.severity = warning
