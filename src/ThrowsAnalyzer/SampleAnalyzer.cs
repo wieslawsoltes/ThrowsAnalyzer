@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -42,38 +43,48 @@ public class SampleAnalyzer : DiagnosticAnalyzer
     {
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
 
-        // Check if method body contains any throw statements
+        if (HasThrowStatements(methodDeclaration))
+        {
+            var diagnostic = Diagnostic.Create(
+                Rule,
+                methodDeclaration.Identifier.GetLocation(),
+                methodDeclaration.Identifier.Text);
+
+            context.ReportDiagnostic(diagnostic);
+        }
+    }
+
+    private static bool HasThrowStatements(MethodDeclarationSyntax methodDeclaration)
+    {
+        var nodesToCheck = GetNodesToAnalyze(methodDeclaration);
+
+        foreach (var node in nodesToCheck)
+        {
+            if (ContainsThrowSyntax(node))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<SyntaxNode> GetNodesToAnalyze(MethodDeclarationSyntax methodDeclaration)
+    {
         if (methodDeclaration.Body != null)
         {
-            var throwStatements = methodDeclaration.Body.DescendantNodes()
-                .OfType<ThrowStatementSyntax>();
-
-            if (throwStatements.Any())
-            {
-                var diagnostic = Diagnostic.Create(
-                    Rule,
-                    methodDeclaration.Identifier.GetLocation(),
-                    methodDeclaration.Identifier.Text);
-
-                context.ReportDiagnostic(diagnostic);
-            }
+            yield return methodDeclaration.Body;
         }
-        // Check expression-bodied methods
-        else if (methodDeclaration.ExpressionBody != null)
+
+        if (methodDeclaration.ExpressionBody != null)
         {
-            var throwExpressions = methodDeclaration.ExpressionBody.DescendantNodes()
-                .OfType<ThrowExpressionSyntax>();
-
-            if (throwExpressions.Any())
-            {
-                var diagnostic = Diagnostic.Create(
-                    Rule,
-                    methodDeclaration.Identifier.GetLocation(),
-                    methodDeclaration.Identifier.Text);
-
-                context.ReportDiagnostic(diagnostic);
-            }
+            yield return methodDeclaration.ExpressionBody;
         }
+    }
+
+    private static bool ContainsThrowSyntax(SyntaxNode node)
+    {
+        return node.DescendantNodes().Any(n => n is ThrowStatementSyntax or ThrowExpressionSyntax);
     }
 }
 }
