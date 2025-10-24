@@ -155,4 +155,125 @@ public class LibraryService
             Total Members: {_members.Count}
             """;
     }
+
+    // Method with try-catch blocks (demonstrates THROWS003)
+    // This method handles exceptions gracefully instead of propagating them
+    public bool TryCheckOutBookToMember(string isbn, string memberId, out string? errorMessage)
+    {
+        errorMessage = null;
+
+        try
+        {
+            // Attempt to validate and checkout the book
+            ValidateCheckout(isbn, memberId);
+
+            var book = _books[isbn];
+            var member = _members[memberId];
+
+            member.CheckOutBook(isbn);
+            book.MarkAsCheckedOut();
+
+            return true;
+        }
+        catch (KeyNotFoundException ex)
+        {
+            errorMessage = $"Not found: {ex.Message}";
+            return false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = $"Invalid operation: {ex.Message}";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+            return false;
+        }
+    }
+
+    // Another method with try-catch for return operations (demonstrates THROWS003)
+    public bool TryReturnBookFromMember(string isbn, string memberId, out string? errorMessage)
+    {
+        errorMessage = null;
+
+        try
+        {
+            ValidateReturn(isbn, memberId);
+
+            var book = _books[isbn];
+            var member = _members[memberId];
+
+            member.ReturnBook(isbn);
+            book.MarkAsReturned();
+
+            return true;
+        }
+        catch (KeyNotFoundException ex)
+        {
+            errorMessage = $"Not found: {ex.Message}";
+            return false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = $"Invalid operation: {ex.Message}";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+            return false;
+        }
+    }
+
+    // Method with nested try-catch blocks (demonstrates THROWS003)
+    public void BatchCheckoutBooks(string memberId, List<string> isbns)
+    {
+        var successfulCheckouts = new List<string>();
+
+        try
+        {
+            foreach (var isbn in isbns)
+            {
+                try
+                {
+                    ValidateCheckout(isbn, memberId);
+
+                    var book = _books[isbn];
+                    var member = _members[memberId];
+
+                    member.CheckOutBook(isbn);
+                    book.MarkAsCheckedOut();
+
+                    successfulCheckouts.Add(isbn);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Log individual book checkout failure and continue
+                    Console.WriteLine($"Failed to checkout {isbn}: {ex.Message}");
+                }
+            }
+        }
+        catch (KeyNotFoundException ex)
+        {
+            // Handle member not found
+            Console.WriteLine($"Member error: {ex.Message}");
+
+            // Rollback successful checkouts
+            foreach (var isbn in successfulCheckouts)
+            {
+                try
+                {
+                    var book = _books[isbn];
+                    var member = _members[memberId];
+                    member.ReturnBook(isbn);
+                    book.MarkAsReturned();
+                }
+                catch (Exception rollbackEx)
+                {
+                    Console.WriteLine($"Rollback failed for {isbn}: {rollbackEx.Message}");
+                }
+            }
+        }
+    }
 }

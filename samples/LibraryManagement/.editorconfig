@@ -1,0 +1,6 @@
+root = true
+
+[*.cs]
+
+# Make THROWS003 visible as a warning for demonstration purposes
+dotnet_diagnostic.THROWS003.severity = warning
