@@ -36,5 +36,21 @@ namespace ThrowsAnalyzer
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true,
             description: Description002);
+
+        // THROWS003: Method contains try/catch block
+        public const string DiagnosticId003 = "THROWS003";
+
+        private static readonly LocalizableString Title003 = "Method contains try/catch block";
+        private static readonly LocalizableString MessageFormat003 = "Method '{0}' contains try/catch block(s)";
+        private static readonly LocalizableString Description003 = "Detects methods that contain try/catch blocks.";
+
+        public static readonly DiagnosticDescriptor MethodContainsTryCatch = new DiagnosticDescriptor(
+            DiagnosticId003,
+            Title003,
+            MessageFormat003,
+            Category,
+            DiagnosticSeverity.Info,
+            isEnabledByDefault: true,
+            description: Description003);
     }
 }
