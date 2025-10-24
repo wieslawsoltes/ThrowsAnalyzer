@@ -33,6 +33,107 @@ dotnet add package ThrowsAnalyzer
 
 Once installed, the analyzer runs automatically during compilation. Diagnostics will appear in your IDE and build output.
 
+## Configuration
+
+ThrowsAnalyzer provides granular configuration options through `.editorconfig` files. You can control both analyzer severity and which member types to analyze.
+
+### Configuring Analyzer Severity
+
+Control the severity of each diagnostic rule:
+
+```ini
+[*.cs]
+
+# THROWS001: Detects throw statements in members
+dotnet_diagnostic.THROWS001.severity = warning
+
+# THROWS002: Detects unhandled throw statements (not wrapped in try-catch)
+dotnet_diagnostic.THROWS002.severity = warning
+
+# THROWS003: Detects try-catch blocks in members
+dotnet_diagnostic.THROWS003.severity = suggestion
+```
+
+**Severity options:** `none`, `silent`, `suggestion`, `warning`, `error`
+
+### Configuring Member Type Analysis
+
+Selectively enable or disable analysis for specific member types:
+
+```ini
+[*.cs]
+
+# Analyze regular methods
+throws_analyzer_analyze_methods = true
+
+# Analyze constructors
+throws_analyzer_analyze_constructors = true
+
+# Analyze destructors/finalizers
+throws_analyzer_analyze_destructors = true
+
+# Analyze operator overloads
+throws_analyzer_analyze_operators = true
+
+# Analyze conversion operators (implicit/explicit)
+throws_analyzer_analyze_conversion_operators = true
+
+# Analyze properties (expression-bodied properties)
+throws_analyzer_analyze_properties = true
+
+# Analyze property accessors (get, set, init, add, remove)
+throws_analyzer_analyze_accessors = true
+
+# Analyze local functions
+throws_analyzer_analyze_local_functions = true
+
+# Analyze lambda expressions
+throws_analyzer_analyze_lambdas = true
+
+# Analyze anonymous methods (delegate { } syntax)
+throws_analyzer_analyze_anonymous_methods = true
+```
+
+All member types are analyzed by default. Set any option to `false` to disable analysis for that member type.
+
+### Example Configurations
+
+#### Minimal Configuration (Methods and Constructors Only)
+
+```ini
+[*.cs]
+throws_analyzer_analyze_methods = true
+throws_analyzer_analyze_constructors = true
+throws_analyzer_analyze_destructors = false
+throws_analyzer_analyze_operators = false
+throws_analyzer_analyze_conversion_operators = false
+throws_analyzer_analyze_properties = false
+throws_analyzer_analyze_accessors = false
+throws_analyzer_analyze_local_functions = false
+throws_analyzer_analyze_lambdas = false
+throws_analyzer_analyze_anonymous_methods = false
+```
+
+#### Focus on Unhandled Exceptions Only
+
+```ini
+[*.cs]
+dotnet_diagnostic.THROWS001.severity = none
+dotnet_diagnostic.THROWS002.severity = error
+dotnet_diagnostic.THROWS003.severity = none
+```
+
+#### Disable Analysis for Lambdas and Local Functions
+
+```ini
+[*.cs]
+throws_analyzer_analyze_local_functions = false
+throws_analyzer_analyze_lambdas = false
+throws_analyzer_analyze_anonymous_methods = false
+```
+
+See [.editorconfig.example](.editorconfig.example) for a complete configuration template.
+
 ## Building from Source
 
 ```bash

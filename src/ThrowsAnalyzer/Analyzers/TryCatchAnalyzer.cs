@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ThrowsAnalyzer.Core;
+using ThrowsAnalyzer.Configuration;
 
 namespace ThrowsAnalyzer
 {
@@ -27,6 +28,13 @@ public class TryCatchAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeExecutableMember(SyntaxNodeAnalysisContext context)
     {
         var node = context.Node;
+
+        // Check if this member type is enabled in configuration
+        var memberTypeKey = AnalyzerOptionsReader.GetMemberTypeKey(node.Kind());
+        if (!AnalyzerOptionsReader.IsMemberTypeEnabled(context.Options, context.Node.SyntaxTree, memberTypeKey))
+        {
+            return;
+        }
 
         // Use generic detector
         if (!ExecutableMemberHelper.IsExecutableMember(node))
