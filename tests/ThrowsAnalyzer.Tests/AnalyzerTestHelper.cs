@@ -1,7 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace ThrowsAnalyzer.Tests;
 
@@ -23,6 +25,14 @@ public static class AnalyzerTestHelper
 
         var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
         return diagnostics.ToArray();
+    }
+
+    public static MethodDeclarationSyntax GetMethodFromCode(string code)
+    {
+        var tree = CSharpSyntaxTree.ParseText(code);
+        var root = tree.GetRoot();
+        var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>().First();
+        return method;
     }
 
     private static Project CreateProject(string source)
