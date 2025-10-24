@@ -10,13 +10,14 @@ namespace ThrowsAnalyzer.Tests;
 public class SampleAnalyzerTests
 {
     [TestMethod]
-    public async Task MethodWithLowercaseName_ShouldReportDiagnostic()
+    public async Task MethodWithThrowStatement_ShouldReportDiagnostic()
     {
         var testCode = """
             class TestClass
             {
-                void myMethod()
+                void ThrowingMethod()
                 {
+                    throw new System.Exception("Error");
                 }
             }
             """;
@@ -25,17 +26,18 @@ public class SampleAnalyzerTests
 
         Assert.AreEqual(1, diagnostics.Length);
         Assert.AreEqual("THROWS001", diagnostics[0].Id);
-        Assert.IsTrue(diagnostics[0].GetMessage().Contains("myMethod"));
+        Assert.IsTrue(diagnostics[0].GetMessage().Contains("ThrowingMethod"));
     }
 
     [TestMethod]
-    public async Task MethodWithUppercaseName_ShouldNotReportDiagnostic()
+    public async Task MethodWithoutThrowStatement_ShouldNotReportDiagnostic()
     {
         var testCode = """
             class TestClass
             {
-                void MyMethod()
+                void SafeMethod()
                 {
+                    var x = 42;
                 }
             }
             """;
@@ -43,6 +45,46 @@ public class SampleAnalyzerTests
         var diagnostics = await GetDiagnosticsAsync(testCode);
 
         Assert.AreEqual(0, diagnostics.Length);
+    }
+
+    [TestMethod]
+    public async Task MethodWithThrowExpression_ShouldReportDiagnostic()
+    {
+        var testCode = """
+            class TestClass
+            {
+                int ThrowingProperty() => throw new System.Exception("Error");
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(testCode);
+
+        Assert.AreEqual(1, diagnostics.Length);
+        Assert.AreEqual("THROWS001", diagnostics[0].Id);
+        Assert.IsTrue(diagnostics[0].GetMessage().Contains("ThrowingProperty"));
+    }
+
+    [TestMethod]
+    public async Task MethodWithMultipleThrows_ShouldReportOneDiagnostic()
+    {
+        var testCode = """
+            class TestClass
+            {
+                void MultipleThrows(int x)
+                {
+                    if (x < 0)
+                        throw new System.ArgumentException("Negative");
+                    if (x > 100)
+                        throw new System.ArgumentException("Too large");
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(testCode);
+
+        Assert.AreEqual(1, diagnostics.Length);
+        Assert.AreEqual("THROWS001", diagnostics[0].Id);
+        Assert.IsTrue(diagnostics[0].GetMessage().Contains("MultipleThrows"));
     }
 
     private static async Task<Diagnostic[]> GetDiagnosticsAsync(string source)

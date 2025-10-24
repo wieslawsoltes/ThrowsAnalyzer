@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,9 +14,9 @@ public class SampleAnalyzer : DiagnosticAnalyzer
     public const string DiagnosticId = "THROWS001";
     private const string Category = "Usage";
 
-    private static readonly LocalizableString Title = "Sample analyzer rule";
-    private static readonly LocalizableString MessageFormat = "Sample diagnostic message: '{0}'";
-    private static readonly LocalizableString Description = "This is a sample analyzer for demonstration purposes.";
+    private static readonly LocalizableString Title = "Method contains throw statement";
+    private static readonly LocalizableString MessageFormat = "Method '{0}' contains throw statement(s)";
+    private static readonly LocalizableString Description = "Detects methods that contain throw statements.";
 
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
         DiagnosticId,
@@ -41,16 +42,37 @@ public class SampleAnalyzer : DiagnosticAnalyzer
     {
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
 
-        // Example: Report diagnostic if method name starts with lowercase
-        if (methodDeclaration.Identifier.Text.Length > 0 &&
-            char.IsLower(methodDeclaration.Identifier.Text[0]))
+        // Check if method body contains any throw statements
+        if (methodDeclaration.Body != null)
         {
-            var diagnostic = Diagnostic.Create(
-                Rule,
-                methodDeclaration.Identifier.GetLocation(),
-                methodDeclaration.Identifier.Text);
+            var throwStatements = methodDeclaration.Body.DescendantNodes()
+                .OfType<ThrowStatementSyntax>();
 
-            context.ReportDiagnostic(diagnostic);
+            if (throwStatements.Any())
+            {
+                var diagnostic = Diagnostic.Create(
+                    Rule,
+                    methodDeclaration.Identifier.GetLocation(),
+                    methodDeclaration.Identifier.Text);
+
+                context.ReportDiagnostic(diagnostic);
+            }
+        }
+        // Check expression-bodied methods
+        else if (methodDeclaration.ExpressionBody != null)
+        {
+            var throwExpressions = methodDeclaration.ExpressionBody.DescendantNodes()
+                .OfType<ThrowExpressionSyntax>();
+
+            if (throwExpressions.Any())
+            {
+                var diagnostic = Diagnostic.Create(
+                    Rule,
+                    methodDeclaration.Identifier.GetLocation(),
+                    methodDeclaration.Identifier.Text);
+
+                context.ReportDiagnostic(diagnostic);
+            }
         }
     }
 }
