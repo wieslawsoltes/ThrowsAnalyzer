@@ -8,7 +8,7 @@ namespace ThrowsAnalyzer
 {
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class SampleAnalyzer : DiagnosticAnalyzer
+public class MethodThrowsAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(MethodThrowsDiagnosticsBuilder.MethodContainsThrowStatement);

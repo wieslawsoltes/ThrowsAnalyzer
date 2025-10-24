@@ -3,7 +3,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace ThrowsAnalyzer.Tests;
 
 [TestClass]
-public class SampleAnalyzerTests
+public class MethodThrowsAnalyzerTests
 {
     [TestMethod]
     public async Task MethodWithThrowStatement_ShouldReportDiagnostic()
@@ -18,7 +18,7 @@ public class SampleAnalyzerTests
             }
             """;
 
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<SampleAnalyzer>(testCode);
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
 
         Assert.AreEqual(1, diagnostics.Length);
         Assert.AreEqual("THROWS001", diagnostics[0].Id);
@@ -38,7 +38,7 @@ public class SampleAnalyzerTests
             }
             """;
 
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<SampleAnalyzer>(testCode);
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
 
         Assert.AreEqual(0, diagnostics.Length);
     }
@@ -53,7 +53,7 @@ public class SampleAnalyzerTests
             }
             """;
 
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<SampleAnalyzer>(testCode);
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
 
         Assert.AreEqual(1, diagnostics.Length);
         Assert.AreEqual("THROWS001", diagnostics[0].Id);
@@ -76,7 +76,7 @@ public class SampleAnalyzerTests
             }
             """;
 
-        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<SampleAnalyzer>(testCode);
+        var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<MethodThrowsAnalyzer>(testCode);
 
         Assert.AreEqual(1, diagnostics.Length);
         Assert.AreEqual("THROWS001", diagnostics[0].Id);
