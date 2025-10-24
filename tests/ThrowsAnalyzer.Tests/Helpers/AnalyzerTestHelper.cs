@@ -38,7 +38,7 @@ public static class AnalyzerTestHelper
                 concurrentAnalysis: true,
                 logAnalyzerExecutionTime: false)
             : new CompilationWithAnalyzersOptions(
-                options: null,
+                options: new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
                 onAnalyzerException: null,
                 concurrentAnalysis: true,
                 logAnalyzerExecutionTime: false);
