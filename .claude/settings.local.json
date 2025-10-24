@@ -13,7 +13,10 @@
       "Bash(git log:*)",
       "Bash(git restore:*)",
       "Bash(dotnet run:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet pack:*)",
+      "Bash(unzip:*)"
     ],
     "deny": [],
     "ask": []
