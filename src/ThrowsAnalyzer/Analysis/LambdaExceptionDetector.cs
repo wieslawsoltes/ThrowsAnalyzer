@@ -105,6 +105,11 @@ namespace ThrowsAnalyzer.Analysis
             if (body == null)
                 return Enumerable.Empty<ThrowExpressionSyntax>();
 
+            // Check if body itself is a throw expression (expression-bodied lambda)
+            if (body is ThrowExpressionSyntax throwExpr)
+                return new[] { throwExpr };
+
+            // Otherwise, search descendants
             return body.DescendantNodes()
                 .OfType<ThrowExpressionSyntax>();
         }

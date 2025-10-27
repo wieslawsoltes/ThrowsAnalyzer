@@ -56,11 +56,29 @@ public static class AnalyzerTestHelper
         var projectId = ProjectId.CreateNewId();
         var documentId = DocumentId.CreateNewId(projectId);
 
+        // Add comprehensive assembly references
+        var references = new[]
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.EventHandler).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.Console).Assembly.Location),
+        };
+
+        // Add System.Runtime explicitly
+        var runtimeAssembly = System.Reflection.Assembly.Load("System.Runtime");
+        references = references.Append(MetadataReference.CreateFromFile(runtimeAssembly.Location)).ToArray();
+
         var solution = new AdhocWorkspace()
             .CurrentSolution
-            .AddProject(projectId, "TestProject", "TestProject", LanguageNames.CSharp)
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
-            .AddDocument(documentId, "Test.cs", source);
+            .AddProject(projectId, "TestProject", "TestProject", LanguageNames.CSharp);
+
+        foreach (var reference in references)
+        {
+            solution = solution.AddMetadataReference(projectId, reference);
+        }
+
+        solution = solution.AddDocument(documentId, "Test.cs", source);
 
         return solution.GetProject(projectId)!;
     }
