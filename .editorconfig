@@ -161,28 +161,116 @@ end_of_line = lf
 # ========================================
 # ThrowsAnalyzer - Diagnostic Severity Configuration
 # ========================================
+# Configure severity for all 30 ThrowsAnalyzer diagnostics
+# Severity options: error, warning, suggestion, silent, none
+# ========================================
 
-# THROWS001: Method contains throw statement
+# ----------------------------------------
+# Category 1: Basic Exception Handling
+# ----------------------------------------
+
+# THROWS001: Method contains throw statement (informational)
 dotnet_diagnostic.THROWS001.severity = suggestion
 
 # THROWS002: Method contains unhandled throw statement
 dotnet_diagnostic.THROWS002.severity = warning
 
-# THROWS003: Method contains try/catch block
+# THROWS003: Method contains try/catch block (informational)
 dotnet_diagnostic.THROWS003.severity = suggestion
 
 # THROWS004: Rethrow anti-pattern (throw ex; instead of throw;)
+# This resets the stack trace - should be 'throw;'
 dotnet_diagnostic.THROWS004.severity = warning
 
 # THROWS007: Unreachable catch clause due to ordering
+# Catch clauses must be ordered from most specific to most general
 dotnet_diagnostic.THROWS007.severity = warning
 
 # THROWS008: Empty catch block swallows exceptions
+# Swallowing exceptions can hide bugs
 dotnet_diagnostic.THROWS008.severity = warning
 
 # THROWS009: Catch block only rethrows exception
+# Unnecessary catch that adds no value
 dotnet_diagnostic.THROWS009.severity = suggestion
 
 # THROWS010: Overly broad exception catch
+# Catching System.Exception is too broad - catch specific exceptions
 dotnet_diagnostic.THROWS010.severity = suggestion
+
+# ----------------------------------------
+# Category 2: Exception Flow Analysis
+# ----------------------------------------
+
+# THROWS017: Unhandled method call exception
+# Called method throws exception that is not caught or documented
+dotnet_diagnostic.THROWS017.severity = warning
+
+# THROWS018: Deep exception propagation (informational)
+# Exception propagates through many method calls
+dotnet_diagnostic.THROWS018.severity = suggestion
+
+# THROWS019: Undocumented public exception
+# Public API throws exception without XML documentation
+dotnet_diagnostic.THROWS019.severity = warning
+
+# ----------------------------------------
+# Category 3: Async Exception Patterns
+# ----------------------------------------
+
+# THROWS020: Async synchronous throw
+# Throwing synchronously in async method (before first await)
+dotnet_diagnostic.THROWS020.severity = warning
+
+# THROWS021: Async void exception
+# async void methods that throw can crash the application
+dotnet_diagnostic.THROWS021.severity = error
+
+# THROWS022: Unobserved Task exception
+# Task returned but not awaited or observed - exception may be lost
+dotnet_diagnostic.THROWS022.severity = warning
+
+# ----------------------------------------
+# Category 4: Iterator Exception Patterns
+# ----------------------------------------
+
+# THROWS023: Deferred iterator exception
+# Exception in yield method is deferred until enumeration
+dotnet_diagnostic.THROWS023.severity = warning
+
+# THROWS024: Iterator try-finally timing (informational)
+# Try-finally in iterator has deferred cleanup timing
+dotnet_diagnostic.THROWS024.severity = suggestion
+
+# ----------------------------------------
+# Category 5: Lambda Exception Patterns
+# ----------------------------------------
+
+# THROWS025: Lambda uncaught exception
+# Lambda expression (LINQ, Task.Run, etc.) throws uncaught exception
+dotnet_diagnostic.THROWS025.severity = warning
+
+# THROWS026: Event handler lambda exception
+# Event handler lambda throws exception - may crash application
+dotnet_diagnostic.THROWS026.severity = error
+
+# ----------------------------------------
+# Category 6: Best Practices
+# ----------------------------------------
+
+# THROWS027: Exception used for control flow
+# Using exceptions for normal program flow - use conditional logic instead
+dotnet_diagnostic.THROWS027.severity = warning
+
+# THROWS028: Custom exception naming convention
+# Custom exception type doesn't end with "Exception" suffix
+dotnet_diagnostic.THROWS028.severity = warning
+
+# THROWS029: Exception in hot path
+# Throwing exceptions in loops - performance issue
+dotnet_diagnostic.THROWS029.severity = warning
+
+# THROWS030: Result pattern suggestion (informational)
+# Consider using Result<T> pattern for expected validation errors
+dotnet_diagnostic.THROWS030.severity = suggestion
 end_of_line = crlf
