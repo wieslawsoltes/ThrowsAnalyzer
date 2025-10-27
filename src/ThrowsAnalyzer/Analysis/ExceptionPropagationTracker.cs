@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -15,13 +16,13 @@ namespace ThrowsAnalyzer.Analysis
     {
         private readonly Compilation _compilation;
         private readonly CancellationToken _cancellationToken;
-        private readonly Dictionary<IMethodSymbol, ExceptionFlowInfo> _cache;
+        private readonly ConcurrentDictionary<IMethodSymbol, ExceptionFlowInfo> _cache;
 
         public ExceptionPropagationTracker(Compilation compilation, CancellationToken cancellationToken = default)
         {
             _compilation = compilation;
             _cancellationToken = cancellationToken;
-            _cache = new Dictionary<IMethodSymbol, ExceptionFlowInfo>(SymbolEqualityComparer.Default);
+            _cache = new ConcurrentDictionary<IMethodSymbol, ExceptionFlowInfo>(SymbolEqualityComparer.Default);
         }
 
         /// <summary>
@@ -35,9 +36,14 @@ namespace ThrowsAnalyzer.Analysis
 
             var flowInfo = new ExceptionFlowInfo(method);
 
-            // Add placeholder to cache immediately to prevent infinite recursion
-            // in case of circular method calls
-            _cache[method] = flowInfo;
+            // Try to add placeholder to cache atomically to prevent infinite recursion
+            // in case of circular method calls. If another thread already added it,
+            // use that instance instead.
+            if (!_cache.TryAdd(method, flowInfo))
+            {
+                // Another thread is already analyzing this method, return what's in cache
+                return _cache[method];
+            }
 
             // Find the method's syntax node
             var syntaxReferences = method.DeclaringSyntaxReferences;
