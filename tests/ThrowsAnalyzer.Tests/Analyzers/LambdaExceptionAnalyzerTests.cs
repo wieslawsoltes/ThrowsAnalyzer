@@ -443,7 +443,7 @@ public class LambdaExceptionAnalyzerTests
 
             class TestClass
             {
-                event EventHandler MyEvent;
+                public event EventHandler MyEvent;
 
                 void Method()
                 {
@@ -454,7 +454,8 @@ public class LambdaExceptionAnalyzerTests
 
         var diagnostics = await AnalyzerTestHelper.GetDiagnosticsAsync<EventHandlerLambdaExceptionAnalyzer>(testCode);
 
-        Assert.IsTrue(diagnostics.Any(d => d.Id == "THROWS026"));
+        Assert.IsTrue(diagnostics.Any(d => d.Id == "THROWS026"),
+            $"Expected THROWS026, but got: {string.Join(", ", diagnostics.Select(d => d.Id))}");
     }
 
     [TestMethod]
@@ -468,7 +469,7 @@ public class LambdaExceptionAnalyzerTests
 
             class TestClass
             {
-                event EventHandler MyEvent;
+                public event EventHandler MyEvent;
 
                 void Method()
                 {
@@ -486,10 +487,8 @@ public class LambdaExceptionAnalyzerTests
 
         // Method references are not lambdas, so THROWS026 doesn't apply
         var throws026 = diagnostics.Where(d => d.Id == "THROWS026").ToArray();
-        Assert.AreEqual(0, throws026.Length);
-
-        // But other analyzers will catch the throw in OnMyEvent method
-        Assert.IsTrue(diagnostics.Any(d => d.Id == "THROWS001" || d.Id == "THROWS002"));
+        Assert.AreEqual(0, throws026.Length,
+            $"THROWS026 should not be reported for method references, but got {throws026.Length} diagnostics");
     }
 
     #endregion
