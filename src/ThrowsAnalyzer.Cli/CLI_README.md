@@ -112,7 +112,7 @@ The tool generates comprehensive reports in `./reports/` by default:
 ## Documentation
 
 For complete documentation, see:
-- [CLI Tool Guide](https://github.com/wieslawsoltes/ThrowsAnalyzer/blob/main/docs/CLI_TOOL.md)
+- [CLI Tool Guide](https://github.com/wieslawsoltes/ThrowsAnalyzer/blob/main/docs/guides/CLI_TOOL.md)
 - [Configuration Guide](https://github.com/wieslawsoltes/ThrowsAnalyzer/blob/main/docs/CONFIGURATION_GUIDE.md)
 - [Main Repository](https://github.com/wieslawsoltes/ThrowsAnalyzer)
 

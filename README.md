@@ -95,7 +95,7 @@ The CLI tool generates comprehensive reports showing:
 - Markdown reports for documentation
 - Detailed diagnostics with code snippets
 
-See [CLI Tool Documentation](docs/CLI_TOOL.md) for complete usage guide and CI/CD integration examples.
+See [CLI Tool Documentation](docs/guides/CLI_TOOL.md) for complete usage guide and CI/CD integration examples.
 
 ## Configuration
 
