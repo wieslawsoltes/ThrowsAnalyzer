@@ -460,7 +460,7 @@ These are transitive dependencies from Roslyn packages. They're used only for co
 
 - **GitHub Issues:** https://github.com/wieslawsoltes/ThrowsAnalyzer/issues
 - **Documentation:** https://github.com/wieslawsoltes/ThrowsAnalyzer/tree/main/docs
-- **Configuration Guide:** [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md)
+- **Configuration Guide:** [CONFIGURATION_GUIDE.md](../CONFIGURATION_GUIDE.md)
 
 ## Version History
 
