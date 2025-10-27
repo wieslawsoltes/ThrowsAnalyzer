@@ -11,13 +11,24 @@
     <!-- CLI Tool Configuration -->
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>throws-analyzer</ToolCommandName>
+    <PackageId>ThrowsAnalyzer.Cli</PackageId>
     <PackageOutputPath>./nupkg</PackageOutputPath>
-    <Description>Command-line tool to run ThrowsAnalyzer and generate reports</Description>
+    <Title>ThrowsAnalyzer CLI - Exception Analysis Tool</Title>
+    <Description>Command-line tool for running ThrowsAnalyzer on projects and solutions, generating comprehensive HTML and Markdown reports with exception handling diagnostics, statistics, and code snippets.</Description>
+    <PackageTags>roslyn;analyzer;cli;tool;exceptions;throw;try-catch;diagnostic;reports;code-quality;static-analysis</PackageTags>
     <Authors>Wiesław Šoltés</Authors>
+    <Copyright>Copyright © 2025 Wiesław Šoltés</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>CLI_README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="CLI_README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Roslyn Workspaces for loading solutions/projects -->

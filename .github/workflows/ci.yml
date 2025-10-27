@@ -56,7 +56,7 @@ jobs:
         path: '**/test-results.trx'
 
   pack:
-    name: Pack NuGet Package
+    name: Pack NuGet Packages
     runs-on: ubuntu-latest
     needs: build
 
@@ -74,13 +74,19 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Pack
+    - name: Pack Analyzer
       run: dotnet pack src/ThrowsAnalyzer/ThrowsAnalyzer.csproj --configuration Release --no-restore --output ./artifacts
+
+    - name: Pack CLI Tool
+      run: dotnet pack src/ThrowsAnalyzer.Cli/ThrowsAnalyzer.Cli.csproj --configuration Release --no-restore --output ./artifacts
+
+    - name: List artifacts
+      run: ls -lh ./artifacts
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: nuget-package
+        name: nuget-packages
         path: ./artifacts/*.nupkg
         retention-days: 7
 
@@ -111,4 +117,5 @@ jobs:
         echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
         echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-        echo "✅ NuGet package created" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Analyzer package created" >> $GITHUB_STEP_SUMMARY
+        echo "✅ CLI tool package created" >> $GITHUB_STEP_SUMMARY
