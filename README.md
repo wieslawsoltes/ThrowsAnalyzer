@@ -9,9 +9,36 @@ A Roslyn-based C# analyzer that detects exception handling patterns in your code
 
 ## Features
 
+### Basic Exception Detection
+
 - **THROWS001**: Detects methods and members containing throw statements
 - **THROWS002**: Identifies unhandled throw statements (throws outside try-catch blocks)
 - **THROWS003**: Flags methods and members containing try-catch blocks
+
+### Advanced Type-Aware Analysis
+
+ThrowsAnalyzer includes semantic model-based exception type analysis for more precise diagnostics:
+
+- **THROWS004**: Detects rethrow anti-pattern (`throw ex;` instead of `throw;`) which modifies stack trace
+- **THROWS007**: Detects unreachable catch clauses due to ordering issues
+- **THROWS008**: Detects empty catch blocks that swallow exceptions
+- **THROWS009**: Detects catch blocks that only rethrow without doing any work
+- **THROWS010**: Detects overly broad exception catches (`System.Exception` or `System.SystemException`)
+
+### Automated Code Fixes
+
+ThrowsAnalyzer provides intelligent code fixes for all diagnostics:
+
+| Diagnostic | Code Fix Options |
+|------------|------------------|
+| **THROWS001** | Wrap throws in try-catch block |
+| **THROWS002** | Wrap unhandled throws in try-catch block |
+| **THROWS003** | Remove try-catch block, Add logging to empty catches |
+| **THROWS004** | Replace `throw ex;` with `throw;` |
+| **THROWS007** | Reorder catch clauses (specific to general) |
+| **THROWS008** | Remove empty catch, Add logging to catch |
+| **THROWS009** | Remove unnecessary rethrow-only catch |
+| **THROWS010** | Add exception filter (`when` clause) |
 
 ## Supported Member Types
 
@@ -68,6 +95,7 @@ Control the severity of each diagnostic rule:
 ```ini
 [*.cs]
 
+# Basic analyzers
 # THROWS001: Detects throw statements in members
 dotnet_diagnostic.THROWS001.severity = suggestion
 
@@ -76,6 +104,22 @@ dotnet_diagnostic.THROWS002.severity = warning
 
 # THROWS003: Detects try-catch blocks in members
 dotnet_diagnostic.THROWS003.severity = suggestion
+
+# Advanced type-aware analyzers
+# THROWS004: Rethrow anti-pattern (throw ex; instead of throw;)
+dotnet_diagnostic.THROWS004.severity = warning
+
+# THROWS007: Unreachable catch clause due to ordering
+dotnet_diagnostic.THROWS007.severity = warning
+
+# THROWS008: Empty catch block swallows exceptions
+dotnet_diagnostic.THROWS008.severity = warning
+
+# THROWS009: Catch block only rethrows exception
+dotnet_diagnostic.THROWS009.severity = suggestion
+
+# THROWS010: Overly broad exception catch
+dotnet_diagnostic.THROWS010.severity = suggestion
 ```
 
 **Severity options:** `none`, `silent`, `suggestion`, `warning`, `error`

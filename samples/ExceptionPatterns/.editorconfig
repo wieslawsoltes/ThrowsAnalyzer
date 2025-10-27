@@ -1,0 +1,19 @@
+[*.cs]
+
+# ThrowsAnalyzer Sample Configuration
+# This configuration makes all diagnostics visible during build
+
+# Set all ThrowsAnalyzer diagnostics to warning for demo purposes
+dotnet_diagnostic.THROWS001.severity = warning
+dotnet_diagnostic.THROWS002.severity = warning
+dotnet_diagnostic.THROWS003.severity = warning
+dotnet_diagnostic.THROWS004.severity = warning
+dotnet_diagnostic.THROWS007.severity = warning
+dotnet_diagnostic.THROWS008.severity = warning
+dotnet_diagnostic.THROWS009.severity = warning
+dotnet_diagnostic.THROWS010.severity = warning
+
+# Disable other analyzers to focus on ThrowsAnalyzer
+dotnet_diagnostic.CA2200.severity = none
+dotnet_diagnostic.CS0162.severity = none
+dotnet_diagnostic.CS0168.severity = none

@@ -18,7 +18,11 @@
       "Bash(dotnet pack:*)",
       "Bash(unzip:*)",
       "Bash(dotnet clean:*)",
-      "Bash(/dev/null)"
+      "Bash(/dev/null)",
+      "Bash(tree:*)",
+      "Bash(xargs:*)",
+      "Bash(cat:*)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []

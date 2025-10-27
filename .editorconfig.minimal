@@ -1,0 +1,89 @@
+# ThrowsAnalyzer - Minimal Configuration Profile
+# Use this profile for minimal interference while catching critical issues.
+# Recommended for: Legacy codebases, prototypes, exploratory projects
+
+[*.cs]
+
+#######################
+# Analyzer Enablement #
+#######################
+
+# Disable informational analyzers
+throws_analyzer_enable_throw_statement = false
+throws_analyzer_enable_unhandled_throw = true
+throws_analyzer_enable_try_catch = false
+
+#########################
+# Diagnostic Severities #
+#########################
+
+# THROWS001: Method contains throw statement
+# Severity: None - Too noisy for large codebases
+dotnet_diagnostic.THROWS001.severity = none
+
+# THROWS002: Unhandled throw statement
+# Severity: Warning - At least know about unhandled throws
+dotnet_diagnostic.THROWS002.severity = warning
+
+# THROWS003: Method contains try-catch block
+# Severity: None - Not useful in minimal mode
+dotnet_diagnostic.THROWS003.severity = none
+
+# THROWS004: Rethrow anti-pattern (throw ex;)
+# Severity: Error - This is always wrong
+dotnet_diagnostic.THROWS004.severity = error
+
+# THROWS007: Unreachable catch clause
+# Severity: Error - Compiler also reports this
+dotnet_diagnostic.THROWS007.severity = error
+
+# THROWS008: Empty catch block swallows exceptions
+# Severity: Error - Critical issue
+dotnet_diagnostic.THROWS008.severity = error
+
+# THROWS009: Catch block only rethrows
+# Severity: None - Not critical
+dotnet_diagnostic.THROWS009.severity = none
+
+# THROWS010: Overly broad exception catch
+# Severity: None - Common pattern in many codebases
+dotnet_diagnostic.THROWS010.severity = none
+
+####################
+# Member Analysis #
+####################
+
+# Analyze only key member types
+throws_analyzer_analyze_methods = true
+throws_analyzer_analyze_constructors = true
+throws_analyzer_analyze_destructors = false
+throws_analyzer_analyze_operators = false
+throws_analyzer_analyze_conversion_operators = false
+throws_analyzer_analyze_properties = false
+throws_analyzer_analyze_accessors = false
+throws_analyzer_analyze_local_functions = false
+throws_analyzer_analyze_lambdas = false
+throws_analyzer_analyze_anonymous_methods = false
+
+##########################
+# Code Fix Preferences   #
+##########################
+
+# Use simple logging
+throws_analyzer_codefix_prefer_logging = false
+
+# Use Console.WriteLine
+throws_analyzer_codefix_logging_framework = Console.WriteLine
+
+# Don't add TODO comments
+throws_analyzer_codefix_add_todo_comments = false
+
+# Catch general exceptions
+throws_analyzer_codefix_catch_exception_type = general
+
+# Wrap entire methods if needed
+throws_analyzer_codefix_wrap_entire_method = true
+
+# Don't automatically remove catches
+throws_analyzer_codefix_remove_empty_catches = false
+throws_analyzer_codefix_remove_rethrow_only = false

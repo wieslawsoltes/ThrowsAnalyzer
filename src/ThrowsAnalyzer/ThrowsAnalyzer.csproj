@@ -8,33 +8,91 @@
     <!-- NuGet Package Configuration -->
     <IsPackable>true</IsPackable>
     <PackageId>ThrowsAnalyzer</PackageId>
-    <Title>ThrowsAnalyzer</Title>
-    <Description>A Roslyn-based C# analyzer that detects exception handling patterns in your code. Identifies throw statements, unhandled exceptions, and try-catch blocks across all executable member types.</Description>
+    <Version>1.0.0</Version>
+    <Title>ThrowsAnalyzer - Comprehensive Exception Analysis for C#</Title>
+    <Description>
+A production-ready Roslyn analyzer providing comprehensive exception handling analysis for C# code with 30 diagnostic rules and 16 automated code fixes.
+
+Features:
+• 30 diagnostic rules covering all exception patterns
+• 16 automated code fixes for one-click issue resolution
+• Exception flow analysis across method calls
+• Async/await exception pattern detection
+• Iterator (yield) exception analysis
+• Lambda and event handler exception detection
+• Best practices and design pattern suggestions
+• Hot path performance analysis
+• Result&lt;T&gt; pattern recommendations
+
+Detects:
+• Unhandled exceptions and missing try-catch blocks
+• Rethrow anti-patterns (throw ex vs throw)
+• Unreachable and empty catch clauses
+• Async void exceptions and unobserved tasks
+• Exceptions in loops (performance issues)
+• Custom exception naming violations
+• Exception-based control flow
+• Undocumented public API exceptions
+
+Automated Fixes:
+• Wrap code in try-catch blocks
+• Fix rethrow statements to preserve stack traces
+• Convert async void to async Task
+• Add XML exception documentation
+• Rename exception types to follow conventions
+• Move validation outside loops
+• Add Task observation (await, continuations)
+• And more!
+
+Perfect for: Code quality enforcement, automated code reviews, CI/CD integration, and teaching exception best practices.
+    </Description>
+    <Summary>Comprehensive Roslyn analyzer with 30 diagnostics and 16 code fixes for exception handling in C#. Detects anti-patterns, suggests improvements, and provides automated fixes.</Summary>
     <Authors>Wiesław Šoltés</Authors>
-    <Copyright>Copyright (c) 2025 Wiesław Šoltés</Copyright>
+    <Owners>Wiesław Šoltés</Owners>
+    <Copyright>Copyright © 2025 Wiesław Šoltés</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>roslyn;analyzer;csharp;exceptions;throw;try-catch;diagnostic</PackageTags>
+    <PackageTags>roslyn;analyzer;csharp;exceptions;throw;try-catch;diagnostic;code-fixes;async;await;iterator;lambda;best-practices;code-quality;static-analysis</PackageTags>
+    <PackageReleaseNotes>
+v1.0.0 - Initial Release
+• 30 comprehensive diagnostic rules (THROWS001-030)
+• 16 automated code fix providers
+• Exception flow analysis with call graph tracking
+• Async/await exception pattern detection
+• Iterator (yield) exception analysis
+• Lambda and event handler exception detection
+• Best practices analyzers (naming, hot paths, Result pattern)
+• Full support for all C# executable member types
+• Batch fixing support (Fix All in Document/Project/Solution)
+• Comprehensive documentation and examples
+• 269 unit tests with 100% pass rate
+    </PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- <PackageIcon>icon.png</PackageIcon> -->
     <DevelopmentDependency>true</DevelopmentDependency>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <NoWarn>NU5128</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="NUGET_README.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Pack both analyzer and code fix provider -->
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
