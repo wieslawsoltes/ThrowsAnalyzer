@@ -61,20 +61,39 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal
 
-    - name: Pack
+    - name: Pack Analyzer
       run: dotnet pack src/ThrowsAnalyzer/ThrowsAnalyzer.csproj --configuration Release --no-build --output ./artifacts
+
+    - name: Pack CLI Tool
+      run: dotnet pack src/ThrowsAnalyzer.Cli/ThrowsAnalyzer.Cli.csproj --configuration Release --no-build --output ./artifacts
 
     - name: List artifacts
       run: ls -la ./artifacts
 
-    - name: Push to NuGet
+    - name: Push Analyzer to NuGet
       if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
-      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: |
+        for file in ./artifacts/ThrowsAnalyzer.*.nupkg; do
+          [[ $file != *"Cli"* ]] && dotnet nuget push "$file" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate || true
+        done
       continue-on-error: false
 
-    - name: Push to NuGet (Pre-release)
+    - name: Push CLI Tool to NuGet
+      if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
+      run: dotnet nuget push ./artifacts/ThrowsAnalyzer.Cli.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      continue-on-error: false
+
+    - name: Push Analyzer to NuGet (Pre-release)
       if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-')
-      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: |
+        for file in ./artifacts/ThrowsAnalyzer.*.nupkg; do
+          [[ $file != *"Cli"* ]] && dotnet nuget push "$file" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate || true
+        done
+      continue-on-error: false
+
+    - name: Push CLI Tool to NuGet (Pre-release)
+      if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-')
+      run: dotnet nuget push ./artifacts/ThrowsAnalyzer.Cli.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
       continue-on-error: false
 
     - name: Create GitHub Release
@@ -93,5 +112,15 @@ jobs:
         echo "📦 Version: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
         echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-        echo "✅ NuGet package published" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Analyzer package published to NuGet" >> $GITHUB_STEP_SUMMARY
+        echo "✅ CLI tool package published to NuGet" >> $GITHUB_STEP_SUMMARY
         echo "✅ GitHub release created" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Installation" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "# Analyzer" >> $GITHUB_STEP_SUMMARY
+        echo "dotnet add package ThrowsAnalyzer" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# CLI Tool" >> $GITHUB_STEP_SUMMARY
+        echo "dotnet tool install --global ThrowsAnalyzer.Cli" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
