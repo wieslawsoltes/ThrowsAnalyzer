@@ -157,4 +157,32 @@ indent_size = 2
 [*.sh]
 end_of_line = lf
 [*.{cmd, bat}]
+
+# ========================================
+# ThrowsAnalyzer - Diagnostic Severity Configuration
+# ========================================
+
+# THROWS001: Method contains throw statement
+dotnet_diagnostic.THROWS001.severity = suggestion
+
+# THROWS002: Method contains unhandled throw statement
+dotnet_diagnostic.THROWS002.severity = warning
+
+# THROWS003: Method contains try/catch block
+dotnet_diagnostic.THROWS003.severity = suggestion
+
+# THROWS004: Rethrow anti-pattern (throw ex; instead of throw;)
+dotnet_diagnostic.THROWS004.severity = warning
+
+# THROWS007: Unreachable catch clause due to ordering
+dotnet_diagnostic.THROWS007.severity = warning
+
+# THROWS008: Empty catch block swallows exceptions
+dotnet_diagnostic.THROWS008.severity = warning
+
+# THROWS009: Catch block only rethrows exception
+dotnet_diagnostic.THROWS009.severity = suggestion
+
+# THROWS010: Overly broad exception catch
+dotnet_diagnostic.THROWS010.severity = suggestion
 end_of_line = crlf

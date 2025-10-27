@@ -1,0 +1,111 @@
+# ThrowsAnalyzer - Recommended Configuration Profile
+# Balanced configuration suitable for most projects.
+# This is the default configuration if no .editorconfig is present.
+# Recommended for: Most applications, libraries, services
+
+[*.cs]
+
+#######################
+# Analyzer Enablement #
+#######################
+
+# Enable all analyzers
+throws_analyzer_enable_throw_statement = true
+throws_analyzer_enable_unhandled_throw = true
+throws_analyzer_enable_try_catch = true
+
+#########################
+# Diagnostic Severities #
+#########################
+
+# THROWS001: Method contains throw statement
+# Severity: Suggestion - Good to know, not critical
+dotnet_diagnostic.THROWS001.severity = suggestion
+
+# THROWS002: Unhandled throw statement
+# Severity: Warning - Should be handled or documented
+dotnet_diagnostic.THROWS002.severity = warning
+
+# THROWS003: Method contains try-catch block
+# Severity: Suggestion - Informational only
+dotnet_diagnostic.THROWS003.severity = suggestion
+
+# THROWS004: Rethrow anti-pattern (throw ex;)
+# Severity: Warning - Should be fixed
+dotnet_diagnostic.THROWS004.severity = warning
+
+# THROWS007: Unreachable catch clause
+# Severity: Warning - Likely a bug
+dotnet_diagnostic.THROWS007.severity = warning
+
+# THROWS008: Empty catch block swallows exceptions
+# Severity: Warning - Usually unintentional
+dotnet_diagnostic.THROWS008.severity = warning
+
+# THROWS009: Catch block only rethrows
+# Severity: Suggestion - Can be simplified
+dotnet_diagnostic.THROWS009.severity = suggestion
+
+# THROWS010: Overly broad exception catch
+# Severity: Suggestion - Consider being more specific
+dotnet_diagnostic.THROWS010.severity = suggestion
+
+####################
+# Member Analysis #
+####################
+
+# Analyze all member types (default)
+throws_analyzer_analyze_methods = true
+throws_analyzer_analyze_constructors = true
+throws_analyzer_analyze_destructors = true
+throws_analyzer_analyze_operators = true
+throws_analyzer_analyze_conversion_operators = true
+throws_analyzer_analyze_properties = true
+throws_analyzer_analyze_accessors = true
+throws_analyzer_analyze_local_functions = true
+throws_analyzer_analyze_lambdas = true
+throws_analyzer_analyze_anonymous_methods = true
+
+##########################
+# Code Fix Preferences   #
+##########################
+
+# Add logging to catch blocks
+throws_analyzer_codefix_prefer_logging = true
+
+# Use Console.WriteLine (change to ILogger if using Microsoft.Extensions.Logging)
+throws_analyzer_codefix_logging_framework = Console.WriteLine
+
+# Add TODO comments to generated code
+throws_analyzer_codefix_add_todo_comments = true
+
+# TODO comment format
+throws_analyzer_codefix_todo_format = TODO:
+
+# Prefer specific exception types
+throws_analyzer_codefix_catch_exception_type = specific
+
+# Don't wrap entire methods
+throws_analyzer_codefix_wrap_entire_method = false
+
+# Remove empty catches
+throws_analyzer_codefix_remove_empty_catches = true
+
+# Remove rethrow-only catches
+throws_analyzer_codefix_remove_rethrow_only = true
+
+#####################
+# Exception Filtering #
+######################
+
+# Don't analyze test methods (they often throw intentionally)
+throws_analyzer_exclude_test_methods = true
+
+# Don't exclude async methods
+throws_analyzer_exclude_async_methods = false
+
+# Exclude finalizers (they shouldn't throw anyway)
+throws_analyzer_exclude_finalizers = true
+
+# Ignore common placeholder exceptions
+throws_analyzer_ignore_exception_types = NotImplementedException,NotSupportedException

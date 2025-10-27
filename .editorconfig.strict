@@ -1,0 +1,94 @@
+# ThrowsAnalyzer - Strict Configuration Profile
+# Use this profile for maximum safety and exception handling awareness.
+# Recommended for: Critical systems, financial applications, healthcare software
+
+[*.cs]
+
+#######################
+# Analyzer Enablement #
+#######################
+
+# Enable all analyzers
+throws_analyzer_enable_throw_statement = true
+throws_analyzer_enable_unhandled_throw = true
+throws_analyzer_enable_try_catch = true
+
+#########################
+# Diagnostic Severities #
+#########################
+
+# THROWS001: Method contains throw statement
+# Severity: Warning - Know where exceptions are thrown
+dotnet_diagnostic.THROWS001.severity = warning
+
+# THROWS002: Unhandled throw statement
+# Severity: Error - All throws must be handled or documented
+dotnet_diagnostic.THROWS002.severity = error
+
+# THROWS003: Method contains try-catch block
+# Severity: None - Exception handling is encouraged
+dotnet_diagnostic.THROWS003.severity = none
+
+# THROWS004: Rethrow anti-pattern (throw ex;)
+# Severity: Error - This modifies stack traces
+dotnet_diagnostic.THROWS004.severity = error
+
+# THROWS007: Unreachable catch clause
+# Severity: Error - Dead code is not acceptable
+dotnet_diagnostic.THROWS007.severity = error
+
+# THROWS008: Empty catch block swallows exceptions
+# Severity: Error - Never swallow exceptions
+dotnet_diagnostic.THROWS008.severity = error
+
+# THROWS009: Catch block only rethrows
+# Severity: Warning - Unnecessary code
+dotnet_diagnostic.THROWS009.severity = warning
+
+# THROWS010: Overly broad exception catch
+# Severity: Warning - Be specific about exceptions
+dotnet_diagnostic.THROWS010.severity = warning
+
+####################
+# Member  Analysis #
+####################
+
+# Analyze all member types
+throws_analyzer_analyze_methods = true
+throws_analyzer_analyze_constructors = true
+throws_analyzer_analyze_destructors = true
+throws_analyzer_analyze_operators = true
+throws_analyzer_analyze_conversion_operators = true
+throws_analyzer_analyze_properties = true
+throws_analyzer_analyze_accessors = true
+throws_analyzer_analyze_local_functions = true
+throws_analyzer_analyze_lambdas = true
+throws_analyzer_analyze_anonymous_methods = true
+
+##########################
+# Code Fix Preferences   #
+##########################
+
+# Always add logging to catch blocks
+throws_analyzer_codefix_prefer_logging = true
+
+# Use ILogger for logging
+throws_analyzer_codefix_logging_framework = ILogger
+
+# Always add TODO comments
+throws_analyzer_codefix_add_todo_comments = true
+
+# TODO format
+throws_analyzer_codefix_todo_format = TODO:
+
+# Catch specific exception types
+throws_analyzer_codefix_catch_exception_type = specific
+
+# Don't wrap entire methods
+throws_analyzer_codefix_wrap_entire_method = false
+
+# Remove empty catches automatically
+throws_analyzer_codefix_remove_empty_catches = true
+
+# Remove rethrow-only catches
+throws_analyzer_codefix_remove_rethrow_only = true
