@@ -2,6 +2,19 @@
 
 This sample project demonstrates all **30 ThrowsAnalyzer diagnostics** and their **16 automated code fixes**.
 
+## ⚠️ Important Note
+
+**This sample project contains intentionally problematic code to demonstrate analyzer diagnostics.**
+
+All diagnostics are configured as **warnings** (not errors) to allow the project to build successfully. The sample shows how the analyzer detects issues, not how to write production code.
+
+**In production code**, you should configure critical diagnostics as **errors**:
+```ini
+dotnet_diagnostic.THROWS004.severity = error  # Rethrow anti-pattern
+dotnet_diagnostic.THROWS021.severity = error  # Async void
+dotnet_diagnostic.THROWS026.severity = error  # Event handler exceptions
+```
+
 ## Purpose
 
 This project contains intentionally problematic code that triggers all ThrowsAnalyzer diagnostic rules. It serves as:
@@ -9,6 +22,7 @@ This project contains intentionally problematic code that triggers all ThrowsAna
 - 🔧 Testing ground for all code fixes
 - 📖 Documentation through working examples
 - 🎓 Learning resource for exception handling best practices
+- ⚠️ **NOT** an example of production-quality code
 
 ## Quick Start
 
@@ -468,6 +482,8 @@ This sample project includes a fully configured `.editorconfig` with:
 - ✅ Severity level guide
 
 **View**: `.editorconfig` in this directory
+
+> **⚠️ Sample Configuration Note**: All diagnostics in this sample are set to `warning` to allow the project to build. In production, set critical diagnostics (THROWS004, 021, 026) to `error` to fail builds on critical issues.
 
 ### Configuration by Category
 
