@@ -35,11 +35,14 @@ namespace ThrowsAnalyzer.Analysis
 
             var flowInfo = new ExceptionFlowInfo(method);
 
+            // Add placeholder to cache immediately to prevent infinite recursion
+            // in case of circular method calls
+            _cache[method] = flowInfo;
+
             // Find the method's syntax node
             var syntaxReferences = method.DeclaringSyntaxReferences;
             if (!syntaxReferences.Any())
             {
-                _cache[method] = flowInfo;
                 return flowInfo;
             }
 
@@ -58,9 +61,6 @@ namespace ThrowsAnalyzer.Analysis
 
             // 4. Calculate propagated exceptions (thrown - caught)
             CalculatePropagatedExceptions(flowInfo, semanticModel);
-
-            // Cache the result
-            _cache[method] = flowInfo;
 
             return flowInfo;
         }
