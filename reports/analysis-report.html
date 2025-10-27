@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThrowsAnalyzer Report - ExceptionPatterns</title>
+  <style>
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #34495e;
+      margin-top: 30px;
+      border-bottom: 2px solid #ecf0f1;
+      padding-bottom: 8px;
+    }
+    h3 {
+      color: #7f8c8d;
+      margin-top: 20px;
+    }
+    .metadata {
+      background: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .metadata p {
+      margin: 5px 0;
+    }
+    .status-success {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    .status-failed {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #3498db;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    th:hover {
+      background: #2980b9;
+    }
+    th.sortable::after {
+      content: ' ⇅';
+      opacity: 0.3;
+    }
+    th.sorted-asc::after {
+      content: ' ▲';
+      opacity: 1;
+    }
+    th.sorted-desc::after {
+      content: ' ▼';
+      opacity: 1;
+    }
+    tr:hover {
+      background: #f8f9fa;
+    }
+    td:last-child, th:last-child {
+      text-align: right;
+    }
+    .diagnostic-card {
+      background: #f8f9fa;
+      border-left: 4px solid #3498db;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+    .diagnostic-error {
+      border-left-color: #e74c3c;
+    }
+    .diagnostic-warning {
+      border-left-color: #f39c12;
+    }
+    .diagnostic-info {
+      border-left-color: #3498db;
+    }
+    .diagnostic-hidden {
+      border-left-color: #95a5a6;
+    }
+    .diagnostic-card h4 {
+      margin-top: 0;
+      color: #2c3e50;
+    }
+    .diagnostic-meta {
+      color: #7f8c8d;
+      font-size: 0.9em;
+      margin: 10px 0;
+    }
+    .code-snippet {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      line-height: 1.4;
+      margin: 10px 0;
+    }
+    .severity-error {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .severity-warning {
+      color: #f39c12;
+      font-weight: bold;
+    }
+    .severity-info {
+      color: #3498db;
+      font-weight: bold;
+    }
+    .chart-container {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 5px;
+    }
+    canvas {
+      max-height: 400px;
+    }
+    .info {
+      background: #d6eaf8;
+      padding: 10px;
+      border-radius: 4px;
+      border-left: 4px solid #3498db;
+    }
+    .messages {
+      background: #fef5e7;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #f39c12;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #ecf0f1;
+      text-align: center;
+      color: #7f8c8d;
+      font-size: 0.9em;
+    }
+    code {
+      background: #ecf0f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    a {
+      color: #3498db;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  
+  </style>
+  <script>
+
+    function initSortableTables() {
+      const tables = document.querySelectorAll('table.sortable');
+      tables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        headers.forEach((header, index) => {
+          header.classList.add('sortable');
+          header.addEventListener('click', () => {
+            sortTable(table, index);
+          });
+        });
+      });
+    }
+
+    function sortTable(table, column) {
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const header = table.querySelectorAll('th')[column];
+      const isAsc = header.classList.contains('sorted-asc');
+
+      // Remove all sorting classes
+      table.querySelectorAll('th').forEach(h => {
+        h.classList.remove('sorted-asc', 'sorted-desc');
+      });
+
+      // Add new sorting class
+      header.classList.add(isAsc ? 'sorted-desc' : 'sorted-asc');
+
+      rows.sort((a, b) => {
+        const aText = a.cells[column].textContent.trim();
+        const bText = b.cells[column].textContent.trim();
+
+        // Try to parse as numbers
+        const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return isAsc ? bNum - aNum : aNum - bNum;
+        }
+
+        // Compare as strings
+        return isAsc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+    }
+  
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>ThrowsAnalyzer Report: ExceptionPatterns</h1>
+    <div class="metadata">
+      <p><strong>Analysis Date:</strong> 2025-10-27 13:30:21</p>
+      <p><strong>Target:</strong> Project - <code>/Users/wieslawsoltes/GitHub/ThrowsAnalyzer/samples/ExceptionPatterns/ExceptionPatterns.csproj</code></p>
+      <p><strong>Configuration:</strong> Debug</p>
+      <p><strong>Duration:</strong> 2.31s</p>
+      <p><strong>Status:</strong> <span class="status-success">✓ Success</span></p>
+    </div>
+    <h2>Summary</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Metric</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Total Diagnostics</td><td>69</td></tr>
+        <tr><td>Errors</td><td class="severity-error">0</td></tr>
+        <tr><td>Warnings</td><td class="severity-warning">69</td></tr>
+        <tr><td>Info/Hidden</td><td>0</td></tr>
+        <tr><td>Projects Analyzed</td><td>1</td></tr>
+        <tr><td>Files Analyzed</td><td>1</td></tr>
+      </tbody>
+    </table>
+    <h2>Diagnostics by ID</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Diagnostic ID</th><th>Count</th><th>Percentage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>THROWS001</td><td>20</td><td>29.0%</td></tr>
+        <tr><td>THROWS002</td><td>19</td><td>27.5%</td></tr>
+        <tr><td>THROWS003</td><td>12</td><td>17.4%</td></tr>
+        <tr><td>THROWS010</td><td>5</td><td>7.2%</td></tr>
+        <tr><td>THROWS026</td><td>3</td><td>4.3%</td></tr>
+        <tr><td>THROWS009</td><td>2</td><td>2.9%</td></tr>
+        <tr><td>THROWS027</td><td>2</td><td>2.9%</td></tr>
+        <tr><td>THROWS004</td><td>2</td><td>2.9%</td></tr>
+        <tr><td>THROWS025</td><td>2</td><td>2.9%</td></tr>
+        <tr><td>THROWS008</td><td>1</td><td>1.4%</td></tr>
+        <tr><td>THROWS017</td><td>1</td><td>1.4%</td></tr>
+      </tbody>
+    </table>
+    <h2>Diagnostics by Severity</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Severity</th><th>Count</th><th>Percentage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="severity-warning">Warning</td><td>69</td><td>100.0%</td></tr>
+      </tbody>
+    </table>
+    <h2>Top 20 Files with Most Diagnostics</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>File</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Program.cs</code></td><td>69</td></tr>
+      </tbody>
+    </table>
+    <h2>Detailed Diagnostics</h2>
+    <h3>Program.cs</h3>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 18, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithThrow&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      15:     }
+      16: 
+      17:     // THROWS001: Method contains throw statement
+&gt;&gt;&gt;   18:     void MethodWithThrow()
+      19:     {
+      20:         throw new InvalidOperationException(&quot;This triggers THROWS001&quot;);
+      21:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 18, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithThrow&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      15:     }
+      16: 
+      17:     // THROWS001: Method contains throw statement
+&gt;&gt;&gt;   18:     void MethodWithThrow()
+      19:     {
+      20:         throw new InvalidOperationException(&quot;This triggers THROWS001&quot;);
+      21:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 24, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithUnhandledThrow&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      21:     }
+      22: 
+      23:     // THROWS002: Unhandled throw statement
+&gt;&gt;&gt;   24:     void MethodWithUnhandledThrow()
+      25:     {
+      26:         Console.WriteLine(&quot;Before throw&quot;);
+      27:         throw new ArgumentNullException(&quot;param&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 24, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithUnhandledThrow&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      21:     }
+      22: 
+      23:     // THROWS002: Unhandled throw statement
+&gt;&gt;&gt;   24:     void MethodWithUnhandledThrow()
+      25:     {
+      26:         Console.WriteLine(&quot;Before throw&quot;);
+      27:         throw new ArgumentNullException(&quot;param&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 32, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithTryCatch&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>      29:     }
+      30: 
+      31:     // THROWS003: Method contains try-catch block
+&gt;&gt;&gt;   32:     void MethodWithTryCatch()
+      33:     {
+      34:         try
+      35:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 38, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MethodWithTryCatch&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>      35:         {
+      36:             DoSomething();
+      37:         }
+&gt;&gt;&gt;   38:         catch (Exception ex)
+      39:         {
+      40:             Console.WriteLine($&quot;Caught: {ex.Message}&quot;);
+      41:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 45, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowAntiPattern&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      42:     }
+      43: 
+      44:     // THROWS004: Rethrow anti-pattern
+&gt;&gt;&gt;   45:     void RethrowAntiPattern()
+      46:     {
+      47:         try
+      48:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 45, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowAntiPattern&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>      42:     }
+      43: 
+      44:     // THROWS004: Rethrow anti-pattern
+&gt;&gt;&gt;   45:     void RethrowAntiPattern()
+      46:     {
+      47:         try
+      48:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 45, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowAntiPattern&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      42:     }
+      43: 
+      44:     // THROWS004: Rethrow anti-pattern
+&gt;&gt;&gt;   45:     void RethrowAntiPattern()
+      46:     {
+      47:         try
+      48:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 51, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowAntiPattern&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>      48:         {
+      49:             DoSomething();
+      50:         }
+&gt;&gt;&gt;   51:         catch (Exception ex)
+      52:         {
+      53:             // This should be &#39;throw;&#39; not &#39;throw ex;&#39;
+      54:             throw ex;</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS004: Rethrow modifies stack trace</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 54, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowAntiPattern&#39;&#39; rethrows exception with &#39;throw ex;&#39; which modifies stack trace - use &#39;throw;&#39; instead</p>
+      <div class="code-snippet">
+<pre>      51:         catch (Exception ex)
+      52:         {
+      53:             // This should be &#39;throw;&#39; not &#39;throw ex;&#39;
+&gt;&gt;&gt;   54:             throw ex;
+      55:         }
+      56:     }
+      57: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 60, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;CatchOrderingIssue&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>      57: 
+      58:     // THROWS007: Unreachable catch clause
+      59:     // Note: The code fix will reorder these catches
+&gt;&gt;&gt;   60:     void CatchOrderingIssue()
+      61:     {
+      62:         try
+      63:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 74, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;CatchOrderingIssue&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>      71:         {
+      72:             Console.WriteLine(&quot;Another specific exception&quot;);
+      73:         }
+&gt;&gt;&gt;   74:         catch (Exception ex)
+      75:         {
+      76:             // General catch should come last
+      77:             Console.WriteLine(&quot;General exception&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 82, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;EmptyCatchBlock&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>      79:     }
+      80: 
+      81:     // THROWS008: Empty catch block
+&gt;&gt;&gt;   82:     void EmptyCatchBlock()
+      83:     {
+      84:         try
+      85:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS008: Empty catch block swallows exceptions</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 88, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;EmptyCatchBlock&#39;&#39; has empty catch block that swallows exceptions</p>
+      <div class="code-snippet">
+<pre>      85:         {
+      86:             DoSomething();
+      87:         }
+&gt;&gt;&gt;   88:         catch (InvalidOperationException)
+      89:         {
+      90:             // Empty - swallows exception
+      91:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 95, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowOnlyCatch&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      92:     }
+      93: 
+      94:     // THROWS009: Catch block only rethrows
+&gt;&gt;&gt;   95:     void RethrowOnlyCatch()
+      96:     {
+      97:         try
+      98:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 95, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowOnlyCatch&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>      92:     }
+      93: 
+      94:     // THROWS009: Catch block only rethrows
+&gt;&gt;&gt;   95:     void RethrowOnlyCatch()
+      96:     {
+      97:         try
+      98:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 95, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowOnlyCatch&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      92:     }
+      93: 
+      94:     // THROWS009: Catch block only rethrows
+&gt;&gt;&gt;   95:     void RethrowOnlyCatch()
+      96:     {
+      97:         try
+      98:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS009: Catch block only rethrows exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 101, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;RethrowOnlyCatch&#39;&#39; has catch block that only rethrows - consider removing unnecessary catch</p>
+      <div class="code-snippet">
+<pre>      98:         {
+      99:             DoSomething();
+     100:         }
+&gt;&gt;&gt;  101:         catch (InvalidOperationException)
+     102:         {
+     103:             throw;
+     104:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 108, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OverlyBroadCatch&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     105:     }
+     106: 
+     107:     // THROWS010: Overly broad exception catch
+&gt;&gt;&gt;  108:     void OverlyBroadCatch()
+     109:     {
+     110:         try
+     111:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 114, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OverlyBroadCatch&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>     111:         {
+     112:             DoSomething();
+     113:         }
+&gt;&gt;&gt;  114:         catch (Exception ex)
+     115:         {
+     116:             // Catching System.Exception is overly broad
+     117:             Console.WriteLine(ex.Message);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 122, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MultipleIssues&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     119:     }
+     120: 
+     121:     // Multiple issues in one method
+&gt;&gt;&gt;  122:     void MultipleIssues()
+     123:     {
+     124:         try
+     125:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 122, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MultipleIssues&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     119:     }
+     120: 
+     121:     // Multiple issues in one method
+&gt;&gt;&gt;  122:     void MultipleIssues()
+     123:     {
+     124:         try
+     125:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 122, Column 10 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MultipleIssues&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     119:     }
+     120: 
+     121:     // Multiple issues in one method
+&gt;&gt;&gt;  122:     void MultipleIssues()
+     123:     {
+     124:         try
+     125:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS027: Exception used for control flow</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 126, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown and caught in the same method - consider using return values instead</p>
+      <div class="code-snippet">
+<pre>     123:     {
+     124:         try
+     125:         {
+&gt;&gt;&gt;  126:             throw new InvalidOperationException();
+     127:         }
+     128:         catch (InvalidOperationException ex)
+     129:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS004: Rethrow modifies stack trace</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 130, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;MultipleIssues&#39;&#39; rethrows exception with &#39;throw ex;&#39; which modifies stack trace - use &#39;throw;&#39; instead</p>
+      <div class="code-snippet">
+<pre>     127:         }
+     128:         catch (InvalidOperationException ex)
+     129:         {
+&gt;&gt;&gt;  130:             throw ex; // THROWS004 - should be &#39;throw;&#39;
+     131:         }
+     132:     }
+     133: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 135, Column 12 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Program&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     132:     }
+     133: 
+     134:     // Constructor with throw
+&gt;&gt;&gt;  135:     public Program()
+     136:     {
+     137:         throw new InvalidOperationException(&quot;Constructor throws&quot;);
+     138:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 135, Column 12 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Program&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     132:     }
+     133: 
+     134:     // Constructor with throw
+&gt;&gt;&gt;  135:     public Program()
+     136:     {
+     137:         throw new InvalidOperationException(&quot;Constructor throws&quot;);
+     138:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 143, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Property &#39;PropertyWithThrow&#39; getter&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     140:     // Property with throw
+     141:     public int PropertyWithThrow
+     142:     {
+&gt;&gt;&gt;  143:         get =&gt; throw new NotImplementedException();
+     144:         set
+     145:         {
+     146:             throw new NotImplementedException();</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 143, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Property &#39;PropertyWithThrow&#39; getter&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     140:     // Property with throw
+     141:     public int PropertyWithThrow
+     142:     {
+&gt;&gt;&gt;  143:         get =&gt; throw new NotImplementedException();
+     144:         set
+     145:         {
+     146:             throw new NotImplementedException();</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 144, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Property &#39;PropertyWithThrow&#39; setter&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     141:     public int PropertyWithThrow
+     142:     {
+     143:         get =&gt; throw new NotImplementedException();
+&gt;&gt;&gt;  144:         set
+     145:         {
+     146:             throw new NotImplementedException();
+     147:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 144, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Property &#39;PropertyWithThrow&#39; setter&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     141:     public int PropertyWithThrow
+     142:     {
+     143:         get =&gt; throw new NotImplementedException();
+&gt;&gt;&gt;  144:         set
+     145:         {
+     146:             throw new NotImplementedException();
+     147:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 151, Column 36 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Operator &#39;+&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     148:     }
+     149: 
+     150:     // Operator with throw
+&gt;&gt;&gt;  151:     public static Program operator +(Program a, Program b)
+     152:     {
+     153:         throw new NotImplementedException();
+     154:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 151, Column 36 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Operator &#39;+&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     148:     }
+     149: 
+     150:     // Operator with throw
+&gt;&gt;&gt;  151:     public static Program operator +(Program a, Program b)
+     152:     {
+     153:         throw new NotImplementedException();
+     154:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 159, Column 14 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Local function &#39;LocalFunction&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     156:     // Local function with throw
+     157:     void MethodWithLocalFunction()
+     158:     {
+&gt;&gt;&gt;  159:         void LocalFunction()
+     160:         {
+     161:             throw new InvalidOperationException();
+     162:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 159, Column 14 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Local function &#39;LocalFunction&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     156:     // Local function with throw
+     157:     void MethodWithLocalFunction()
+     158:     {
+&gt;&gt;&gt;  159:         void LocalFunction()
+     160:         {
+     161:             throw new InvalidOperationException();
+     162:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 164, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;Program.LocalFunction&#39; which may throw InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>     161:             throw new InvalidOperationException();
+     162:         }
+     163: 
+&gt;&gt;&gt;  164:         LocalFunction();
+     165:     }
+     166: 
+     167:     // Lambda with throw</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 170, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     167:     // Lambda with throw
+     168:     void MethodWithLambda()
+     169:     {
+&gt;&gt;&gt;  170:         Action lambda = () =&gt; throw new InvalidOperationException();
+     171:         lambda();
+     172:     }
+     173: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 170, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     167:     // Lambda with throw
+     168:     void MethodWithLambda()
+     169:     {
+&gt;&gt;&gt;  170:         Action lambda = () =&gt; throw new InvalidOperationException();
+     171:         lambda();
+     172:     }
+     173: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 185, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     182:     void EventHandlerLambdaUncaught()
+     183:     {
+     184:         // BAD: Lambda event handler throws without catching
+&gt;&gt;&gt;  185:         DataReceived += (sender, e) =&gt;
+     186:         {
+     187:             throw new InvalidOperationException(&quot;Data processing failed&quot;);
+     188:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 185, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     182:     void EventHandlerLambdaUncaught()
+     183:     {
+     184:         // BAD: Lambda event handler throws without catching
+&gt;&gt;&gt;  185:         DataReceived += (sender, e) =&gt;
+     186:         {
+     187:             throw new InvalidOperationException(&quot;Data processing failed&quot;);
+     188:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS026: Event handler lambda throws exception without catching it</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 187, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Event handler lambda throws System.InvalidOperationException which is not caught - exception may crash application</p>
+      <div class="code-snippet">
+<pre>     184:         // BAD: Lambda event handler throws without catching
+     185:         DataReceived += (sender, e) =&gt;
+     186:         {
+&gt;&gt;&gt;  187:             throw new InvalidOperationException(&quot;Data processing failed&quot;);
+     188:         };
+     189:     }
+     190: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 194, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     191:     // GOOD: Event handler lambda catches exceptions
+     192:     void EventHandlerLambdaCaught()
+     193:     {
+&gt;&gt;&gt;  194:         DataReceived += (sender, e) =&gt;
+     195:         {
+     196:             try
+     197:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 212, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     209:     void EventHandlerWithThrowExpression()
+     210:     {
+     211:         // BAD: Throw expression in event handler lambda
+&gt;&gt;&gt;  212:         DataReceived += (sender, e) =&gt; throw new InvalidOperationException();
+     213:     }
+     214: 
+     215:     // THROWS026: Event handler lambda with rethrow</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 212, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     209:     void EventHandlerWithThrowExpression()
+     210:     {
+     211:         // BAD: Throw expression in event handler lambda
+&gt;&gt;&gt;  212:         DataReceived += (sender, e) =&gt; throw new InvalidOperationException();
+     213:     }
+     214: 
+     215:     // THROWS026: Event handler lambda with rethrow</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 219, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     216:     void EventHandlerWithRethrow()
+     217:     {
+     218:         // BAD: Rethrow still escapes event handler
+&gt;&gt;&gt;  219:         DataReceived += (sender, e) =&gt;
+     220:         {
+     221:             try
+     222:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 219, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     216:     void EventHandlerWithRethrow()
+     217:     {
+     218:         // BAD: Rethrow still escapes event handler
+&gt;&gt;&gt;  219:         DataReceived += (sender, e) =&gt;
+     220:         {
+     221:             try
+     222:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 219, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     216:     void EventHandlerWithRethrow()
+     217:     {
+     218:         // BAD: Rethrow still escapes event handler
+&gt;&gt;&gt;  219:         DataReceived += (sender, e) =&gt;
+     220:         {
+     221:             try
+     222:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS009: Catch block only rethrows exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 225, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; has catch block that only rethrows - consider removing unnecessary catch</p>
+      <div class="code-snippet">
+<pre>     222:             {
+     223:                 ProcessData();
+     224:             }
+&gt;&gt;&gt;  225:             catch (InvalidOperationException)
+     226:             {
+     227:                 throw; // This still crashes the application
+     228:             }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 245, Column 18 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OnDataReceived&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     242:     }
+     243: 
+     244:     // BAD: Event handler method that throws (triggers THROWS001/THROWS002)
+&gt;&gt;&gt;  245:     private void OnDataReceived(object sender, EventArgs e)
+     246:     {
+     247:         throw new InvalidOperationException(&quot;Processing failed&quot;);
+     248:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 245, Column 18 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OnDataReceived&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     242:     }
+     243: 
+     244:     // BAD: Event handler method that throws (triggers THROWS001/THROWS002)
+&gt;&gt;&gt;  245:     private void OnDataReceived(object sender, EventArgs e)
+     246:     {
+     247:         throw new InvalidOperationException(&quot;Processing failed&quot;);
+     248:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 251, Column 18 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OnProcessingCompleted&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     248:     }
+     249: 
+     250:     // GOOD: Event handler method that catches exceptions
+&gt;&gt;&gt;  251:     private void OnProcessingCompleted(object sender, EventArgs e)
+     252:     {
+     253:         try
+     254:         {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 257, Column 9 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;OnProcessingCompleted&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>     254:         {
+     255:             ProcessData();
+     256:         }
+&gt;&gt;&gt;  257:         catch (Exception ex)
+     258:         {
+     259:             Console.WriteLine($&quot;Error: {ex.Message}&quot;);
+     260:         }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 280, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     277:         var button = new Button();
+     278: 
+     279:         // BAD: Uncaught exception in click handler can crash UI application
+&gt;&gt;&gt;  280:         button.Click += (sender, e) =&gt;
+     281:         {
+     282:             throw new InvalidOperationException(&quot;Button action failed&quot;);
+     283:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 280, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     277:         var button = new Button();
+     278: 
+     279:         // BAD: Uncaught exception in click handler can crash UI application
+&gt;&gt;&gt;  280:         button.Click += (sender, e) =&gt;
+     281:         {
+     282:             throw new InvalidOperationException(&quot;Button action failed&quot;);
+     283:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS026: Event handler lambda throws exception without catching it</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 282, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Event handler lambda throws System.InvalidOperationException which is not caught - exception may crash application</p>
+      <div class="code-snippet">
+<pre>     279:         // BAD: Uncaught exception in click handler can crash UI application
+     280:         button.Click += (sender, e) =&gt;
+     281:         {
+&gt;&gt;&gt;  282:             throw new InvalidOperationException(&quot;Button action failed&quot;);
+     283:         };
+     284: 
+     285:         // GOOD: Catch and handle exceptions appropriately</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 286, Column 25 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     283:         };
+     284: 
+     285:         // GOOD: Catch and handle exceptions appropriately
+&gt;&gt;&gt;  286:         button.Click += (sender, e) =&gt;
+     287:         {
+     288:             try
+     289:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 307, Column 28 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     304:     void CustomEventHandlerPattern()
+     305:     {
+     306:         // THROWS026: Custom delegate also triggers the analyzer
+&gt;&gt;&gt;  307:         CustomDataEvent += (sender, args) =&gt;
+     308:         {
+     309:             throw new InvalidOperationException();
+     310:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 307, Column 28 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     304:     void CustomEventHandlerPattern()
+     305:     {
+     306:         // THROWS026: Custom delegate also triggers the analyzer
+&gt;&gt;&gt;  307:         CustomDataEvent += (sender, args) =&gt;
+     308:         {
+     309:             throw new InvalidOperationException();
+     310:         };</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS026: Event handler lambda throws exception without catching it</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 309, Column 13 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Event handler lambda throws System.InvalidOperationException which is not caught - exception may crash application</p>
+      <div class="code-snippet">
+<pre>     306:         // THROWS026: Custom delegate also triggers the analyzer
+     307:         CustomDataEvent += (sender, args) =&gt;
+     308:         {
+&gt;&gt;&gt;  309:             throw new InvalidOperationException();
+     310:         };
+     311:     }
+     312: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 323, Column 34 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     320:         var items = new[] { 1, 2, 3, -1, 5 };
+     321: 
+     322:         // BAD: Lambda throws without catching
+&gt;&gt;&gt;  323:         var result = items.Where(x =&gt;
+     324:         {
+     325:             if (x &lt; 0)
+     326:                 throw new InvalidOperationException(&quot;Negative value&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 323, Column 34 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     320:         var items = new[] { 1, 2, 3, -1, 5 };
+     321: 
+     322:         // BAD: Lambda throws without catching
+&gt;&gt;&gt;  323:         var result = items.Where(x =&gt;
+     324:         {
+     325:             if (x &lt; 0)
+     326:                 throw new InvalidOperationException(&quot;Negative value&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS025: Lambda throws exception without catching it</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 326, Column 17 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Lambda expression throws System.InvalidOperationException which is not caught within the lambda - exception will propagate to LINQ query evaluator</p>
+      <div class="code-snippet">
+<pre>     323:         var result = items.Where(x =&gt;
+     324:         {
+     325:             if (x &lt; 0)
+&gt;&gt;&gt;  326:                 throw new InvalidOperationException(&quot;Negative value&quot;);
+     327:             return x &gt; 1;
+     328:         });
+     329:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 336, Column 34 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     333:     {
+     334:         var items = new[] { 1, 2, 3, -1, 5 };
+     335: 
+&gt;&gt;&gt;  336:         var result = items.Where(x =&gt;
+     337:         {
+     338:             try
+     339:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 336, Column 34 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     333:     {
+     334:         var items = new[] { 1, 2, 3, -1, 5 };
+     335: 
+&gt;&gt;&gt;  336:         var result = items.Where(x =&gt;
+     337:         {
+     338:             try
+     339:             {</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS027: Exception used for control flow</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 341, Column 21 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown and caught in the same method - consider using return values instead</p>
+      <div class="code-snippet">
+<pre>     338:             try
+     339:             {
+     340:                 if (x &lt; 0)
+&gt;&gt;&gt;  341:                     throw new InvalidOperationException(&quot;Negative value&quot;);
+     342:                 return x &gt; 1;
+     343:             }
+     344:             catch (InvalidOperationException)</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS025: Lambda throws exception without catching it</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 357, Column 53 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Lambda expression throws System.ArgumentException which is not caught within the lambda - exception will propagate to LINQ query evaluator</p>
+      <div class="code-snippet">
+<pre>     354:         var items = new[] { 1, 2, 3 };
+     355: 
+     356:         // BAD: Throw expression
+&gt;&gt;&gt;  357:         var result = items.Select(x =&gt; x &gt;= 0 ? x : throw new ArgumentException());
+     358:     }
+     359: 
+     360:     #endregion</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 357, Column 35 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     354:         var items = new[] { 1, 2, 3 };
+     355: 
+     356:         // BAD: Throw expression
+&gt;&gt;&gt;  357:         var result = items.Select(x =&gt; x &gt;= 0 ? x : throw new ArgumentException());
+     358:     }
+     359: 
+     360:     #endregion</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 357, Column 35 | 
+        Project: ExceptionPatterns
+      </div>
+      <p><strong>Message:</strong> Method &#39;Lambda expression&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     354:         var items = new[] { 1, 2, 3 };
+     355: 
+     356:         // BAD: Throw expression
+&gt;&gt;&gt;  357:         var result = items.Select(x =&gt; x &gt;= 0 ? x : throw new ArgumentException());
+     358:     }
+     359: 
+     360:     #endregion</pre>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Generated by ThrowsAnalyzer CLI on 2025-10-27 13:30:23</p>
+      <p><a href="https://github.com/wieslawsoltes/ThrowsAnalyzer" target="_blank">ThrowsAnalyzer on GitHub</a></p>
+    </div>
+  </div>
+  <script>initSortableTables();</script>
+</body>
+</html>

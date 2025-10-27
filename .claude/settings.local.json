@@ -22,7 +22,8 @@
       "Bash(tree:*)",
       "Bash(xargs:*)",
       "Bash(cat:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(open:*)"
     ],
     "deny": [],
     "ask": []

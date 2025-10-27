@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>throws-analyzer</AssemblyName>
+    <RootNamespace>ThrowsAnalyzer.Cli</RootNamespace>
+
+    <!-- CLI Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>throws-analyzer</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
+    <Description>Command-line tool to run ThrowsAnalyzer and generate reports</Description>
+    <Authors>Wiesław Šoltés</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn Workspaces for loading solutions/projects -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.12.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+
+    <!-- CLI Framework -->
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+
+    <!-- ThrowsAnalyzer -->
+    <ProjectReference Include="../ThrowsAnalyzer/ThrowsAnalyzer.csproj" />
+  </ItemGroup>
+
+</Project>

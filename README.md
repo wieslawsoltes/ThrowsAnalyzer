@@ -55,15 +55,44 @@ ThrowsAnalyzer analyzes exception handling patterns in:
 
 ## Installation
 
+### Analyzer Library
+
 Add the analyzer to your project via NuGet:
 
 ```bash
 dotnet add package ThrowsAnalyzer
 ```
 
-## Usage
-
 Once installed, the analyzer runs automatically during compilation. Diagnostics will appear in your IDE and build output.
+
+### CLI Tool
+
+Install the command-line tool globally to analyze projects and generate reports:
+
+```bash
+dotnet tool install --global ThrowsAnalyzer.Cli
+```
+
+#### CLI Quick Start
+
+```bash
+# Analyze a project and generate reports
+throws-analyzer analyze MyProject.csproj
+
+# Analyze a solution
+throws-analyzer analyze MySolution.sln
+
+# Generate HTML and Markdown reports
+throws-analyzer analyze MyProject.csproj --verbose --open
+```
+
+The CLI tool generates comprehensive reports showing:
+- Summary statistics by diagnostic ID, project, severity, and file
+- Interactive HTML reports with sortable tables
+- Markdown reports for documentation
+- Detailed diagnostics with code snippets
+
+See [CLI Tool Documentation](docs/CLI_TOOL.md) for complete usage guide and CI/CD integration examples.
 
 ## Configuration
 
