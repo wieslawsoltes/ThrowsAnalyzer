@@ -9,36 +9,39 @@ A Roslyn-based C# analyzer that detects exception handling patterns in your code
 
 ## Features
 
-### Basic Exception Detection
+ThrowsAnalyzer provides **30 diagnostic rules** organized into 6 categories, with **16 automated code fixes** for quick issue resolution.
 
-- **THROWS001**: Detects methods and members containing throw statements
-- **THROWS002**: Identifies unhandled throw statements (throws outside try-catch blocks)
-- **THROWS003**: Flags methods and members containing try-catch blocks
+### Diagnostic Rules Summary
 
-### Advanced Type-Aware Analysis
+| Category | Diagnostics | Description |
+|----------|------------|-------------|
+| **Basic Exception Handling** | THROWS001-003, 004, 007-010 | Fundamental exception patterns and anti-patterns |
+| **Exception Flow Analysis** | THROWS017-019 | Method call exception propagation and documentation |
+| **Async Exception Patterns** | THROWS020-022 | Async/await exception handling issues |
+| **Iterator Exception Patterns** | THROWS023-024 | Exception handling in yield-based iterators |
+| **Lambda Exception Patterns** | THROWS025-026 | Exception handling in lambda expressions |
+| **Best Practices** | THROWS027-030 | Design patterns and performance recommendations |
 
-ThrowsAnalyzer includes semantic model-based exception type analysis for more precise diagnostics:
+### Code Fixes Summary
 
-- **THROWS004**: Detects rethrow anti-pattern (`throw ex;` instead of `throw;`) which modifies stack trace
-- **THROWS007**: Detects unreachable catch clauses due to ordering issues
-- **THROWS008**: Detects empty catch blocks that swallow exceptions
-- **THROWS009**: Detects catch blocks that only rethrow without doing any work
-- **THROWS010**: Detects overly broad exception catches (`System.Exception` or `System.SystemException`)
-
-### Automated Code Fixes
-
-ThrowsAnalyzer provides intelligent code fixes for all diagnostics:
-
-| Diagnostic | Code Fix Options |
-|------------|------------------|
-| **THROWS001** | Wrap throws in try-catch block |
-| **THROWS002** | Wrap unhandled throws in try-catch block |
-| **THROWS003** | Remove try-catch block, Add logging to empty catches |
-| **THROWS004** | Replace `throw ex;` with `throw;` |
-| **THROWS007** | Reorder catch clauses (specific to general) |
-| **THROWS008** | Remove empty catch, Add logging to catch |
-| **THROWS009** | Remove unnecessary rethrow-only catch |
-| **THROWS010** | Add exception filter (`when` clause) |
+| Code Fix | Diagnostics | Actions |
+|----------|-------------|---------|
+| **Wrap in try-catch** | THROWS001, THROWS002 | Adds try-catch around throwing code |
+| **Fix rethrow** | THROWS004 | Converts `throw ex;` to `throw;` |
+| **Reorder catches** | THROWS007 | Reorders catch clauses from specific to general |
+| **Add/Remove logging** | THROWS008, THROWS003 | Adds logging or removes empty catch |
+| **Remove rethrow-only catch** | THROWS009 | Removes unnecessary catch blocks |
+| **Add exception filter** | THROWS010 | Adds `when` clause to specific catches |
+| **Convert async void** | THROWS021 | Converts async void to async Task |
+| **Add Task observation** | THROWS022 | Adds await or continuation |
+| **Wrap iterator validation** | THROWS023 | Moves validation outside iterator |
+| **Add try-finally** | THROWS024 | Adds try-finally for cleanup |
+| **Wrap lambda in try-catch** | THROWS025, THROWS026 | Adds exception handling to lambdas |
+| **Refactor control flow** | THROWS027 | Suggests return value instead of exceptions |
+| **Rename exception** | THROWS028 | Renames to follow convention |
+| **Move to cold path** | THROWS029 | Suggests refactoring for performance |
+| **Add XML docs** | THROWS019 | Documents thrown exceptions |
+| **Suggest Result pattern** | THROWS030 | Suggests Result<T> for error handling |
 
 ## Supported Member Types
 
@@ -231,6 +234,542 @@ throws_analyzer_analyze_anonymous_methods = false
 ```
 
 See [.editorconfig.example](.editorconfig.example) for a complete configuration template.
+
+## Complete Diagnostic Reference
+
+### Category 1: Basic Exception Handling (8 rules)
+
+#### THROWS001: Method contains throw statement
+**Severity:** Info | **Code Fix:** Wrap in try-catch
+
+Detects any method or member that contains throw statements.
+
+```csharp
+// Before
+void ProcessData(string data)
+{
+    if (string.IsNullOrEmpty(data))
+        throw new ArgumentException("Data cannot be empty");
+}
+
+// After (Code Fix Applied)
+void ProcessData(string data)
+{
+    try
+    {
+        if (string.IsNullOrEmpty(data))
+            throw new ArgumentException("Data cannot be empty");
+    }
+    catch (ArgumentException ex)
+    {
+        // Handle exception
+        throw;
+    }
+}
+```
+
+#### THROWS002: Unhandled throw statement
+**Severity:** Warning | **Code Fix:** Wrap in try-catch
+
+Detects throw statements not wrapped in try-catch blocks.
+
+```csharp
+// Before
+void SaveFile(string path, string content)
+{
+    File.WriteAllText(path, content); // Throws IOException
+}
+
+// After (Code Fix Applied)
+void SaveFile(string path, string content)
+{
+    try
+    {
+        File.WriteAllText(path, content);
+    }
+    catch (IOException ex)
+    {
+        // Handle exception
+        throw;
+    }
+}
+```
+
+#### THROWS003: Method contains try-catch block
+**Severity:** Info | **Code Fix:** Remove try-catch or add logging
+
+Flags methods containing try-catch blocks for tracking exception handling.
+
+#### THROWS004: Rethrow anti-pattern
+**Severity:** Warning | **Code Fix:** Fix rethrow
+
+Detects `throw ex;` which resets the stack trace. Should use `throw;` instead.
+
+```csharp
+// Before - WRONG (resets stack trace)
+try
+{
+    DoSomething();
+}
+catch (Exception ex)
+{
+    throw ex; // ❌ Resets stack trace
+}
+
+// After (Code Fix Applied) - CORRECT
+try
+{
+    DoSomething();
+}
+catch (Exception ex)
+{
+    throw; // ✓ Preserves stack trace
+}
+```
+
+#### THROWS007: Unreachable catch clause
+**Severity:** Warning | **Code Fix:** Reorder catches
+
+Detects catch clauses that can never be reached due to ordering.
+
+```csharp
+// Before - WRONG (InvalidOperationException is unreachable)
+try
+{
+    DoSomething();
+}
+catch (Exception ex) // ❌ Catches everything
+{
+    Log(ex);
+}
+catch (InvalidOperationException ex) // Never reached
+{
+    LogSpecific(ex);
+}
+
+// After (Code Fix Applied) - CORRECT
+try
+{
+    DoSomething();
+}
+catch (InvalidOperationException ex) // ✓ Specific first
+{
+    LogSpecific(ex);
+}
+catch (Exception ex)
+{
+    Log(ex);
+}
+```
+
+#### THROWS008: Empty catch block
+**Severity:** Warning | **Code Fix:** Add logging or remove
+
+Detects empty catch blocks that silently swallow exceptions.
+
+```csharp
+// Before - WRONG
+try
+{
+    LoadConfiguration();
+}
+catch (Exception)
+{
+    // ❌ Empty catch swallows exceptions
+}
+
+// After (Code Fix: Add Logging)
+try
+{
+    LoadConfiguration();
+}
+catch (Exception ex)
+{
+    Logger.LogError(ex, "Failed to load configuration"); // ✓ Logs error
+    throw;
+}
+```
+
+#### THROWS009: Catch block only rethrows
+**Severity:** Info | **Code Fix:** Remove unnecessary catch
+
+Detects catch blocks that only rethrow without doing any work.
+
+```csharp
+// Before - Unnecessary
+try
+{
+    ProcessData();
+}
+catch (Exception ex)
+{
+    throw; // No work done, catch is unnecessary
+}
+
+// After (Code Fix Applied)
+ProcessData(); // ✓ Simplified
+```
+
+#### THROWS010: Overly broad exception catch
+**Severity:** Info | **Code Fix:** Add exception filter
+
+Detects catching `System.Exception` or `System.SystemException`.
+
+```csharp
+// Before - Too broad
+try
+{
+    ParseUserInput(input);
+}
+catch (Exception ex) // ❌ Catches everything
+{
+    LogError(ex);
+}
+
+// After (Code Fix: Add Filter)
+try
+{
+    ParseUserInput(input);
+}
+catch (Exception ex) when (ex is FormatException || ex is ArgumentException) // ✓ Specific
+{
+    LogError(ex);
+}
+```
+
+### Category 2: Exception Flow Analysis (3 rules)
+
+#### THROWS017: Unhandled method call
+**Severity:** Info
+
+Detects method calls that may throw exceptions without try-catch handling.
+
+```csharp
+// Detected
+void ProcessFile(string path)
+{
+    var content = File.ReadAllText(path); // May throw IOException
+    Process(content);
+}
+
+// Recommended
+void ProcessFile(string path)
+{
+    try
+    {
+        var content = File.ReadAllText(path);
+        Process(content);
+    }
+    catch (IOException ex)
+    {
+        Logger.LogError(ex, "Failed to read file: {Path}", path);
+        throw;
+    }
+}
+```
+
+#### THROWS018: Deep exception propagation
+**Severity:** Info
+
+Detects exceptions propagating through many call stack levels.
+
+#### THROWS019: Undocumented public API exception
+**Severity:** Warning | **Code Fix:** Add XML documentation
+
+Detects public methods that throw exceptions without XML documentation.
+
+```csharp
+// Before - Missing documentation
+public void ValidateUser(string username)
+{
+    if (string.IsNullOrEmpty(username))
+        throw new ArgumentException("Username required");
+}
+
+// After (Code Fix Applied)
+/// <summary>
+/// Validates the specified username.
+/// </summary>
+/// <param name="username">The username to validate.</param>
+/// <exception cref="ArgumentException">
+/// Thrown when <paramref name="username"/> is null or empty.
+/// </exception>
+public void ValidateUser(string username)
+{
+    if (string.IsNullOrEmpty(username))
+        throw new ArgumentException("Username required");
+}
+```
+
+### Category 3: Async Exception Patterns (3 rules)
+
+#### THROWS020: Async method throws synchronously
+**Severity:** Warning
+
+Detects async methods that throw exceptions before the first await.
+
+```csharp
+// Before - WRONG (throws before async)
+async Task<string> LoadDataAsync(string id)
+{
+    if (string.IsNullOrEmpty(id))
+        throw new ArgumentException(); // ❌ Synchronous throw
+
+    return await LoadFromDatabaseAsync(id);
+}
+
+// After - CORRECT
+async Task<string> LoadDataAsync(string id)
+{
+    if (string.IsNullOrEmpty(id))
+        return Task.FromException<string>(
+            new ArgumentException()); // ✓ Returns faulted task
+
+    return await LoadFromDatabaseAsync(id);
+}
+```
+
+#### THROWS021: Async void exception
+**Severity:** Error | **Code Fix:** Convert to async Task
+
+Detects async void methods that can crash the application if they throw.
+
+```csharp
+// Before - WRONG (can crash app)
+async void LoadDataButton_Click(object sender, EventArgs e)
+{
+    await LoadDataAsync(); // ❌ Exception crashes app
+}
+
+// After (Code Fix Applied) - CORRECT
+async Task LoadDataButton_Click(object sender, EventArgs e)
+{
+    try
+    {
+        await LoadDataAsync(); // ✓ Exception can be handled
+    }
+    catch (Exception ex)
+    {
+        ShowError(ex.Message);
+    }
+}
+```
+
+#### THROWS022: Unobserved Task exception
+**Severity:** Warning | **Code Fix:** Add await or continuation
+
+Detects Task-returning methods called without await or exception handling.
+
+```csharp
+// Before - WRONG (exception unobserved)
+void ProcessData()
+{
+    LoadDataAsync(); // ❌ Exception lost
+}
+
+// After (Code Fix Applied) - CORRECT
+async Task ProcessData()
+{
+    await LoadDataAsync(); // ✓ Exception propagates
+}
+```
+
+### Category 4: Iterator Exception Patterns (2 rules)
+
+#### THROWS023: Iterator deferred exception
+**Severity:** Info | **Code Fix:** Move validation outside iterator
+
+Detects exceptions in yield-based iterators that are deferred until enumeration.
+
+```csharp
+// Before - WRONG (exception deferred)
+IEnumerable<int> GetNumbers(int count)
+{
+    if (count < 0)
+        throw new ArgumentException(); // ❌ Thrown during enumeration
+
+    for (int i = 0; i < count; i++)
+        yield return i;
+}
+
+// After (Code Fix Applied) - CORRECT
+IEnumerable<int> GetNumbers(int count)
+{
+    if (count < 0)
+        throw new ArgumentException(); // ✓ Thrown immediately
+
+    return GetNumbersIterator(count);
+}
+
+IEnumerable<int> GetNumbersIterator(int count)
+{
+    for (int i = 0; i < count; i++)
+        yield return i;
+}
+```
+
+#### THROWS024: Iterator try-finally issue
+**Severity:** Warning | **Code Fix:** Add proper cleanup
+
+Detects try-finally issues in iterators where finally may not execute.
+
+### Category 5: Lambda Exception Patterns (2 rules)
+
+#### THROWS025: Lambda uncaught exception
+**Severity:** Warning | **Code Fix:** Wrap in try-catch
+
+Detects lambdas that throw exceptions without proper handling.
+
+```csharp
+// Before - WRONG (exception propagates to LINQ)
+var results = items.Select(x => {
+    if (x == null)
+        throw new ArgumentNullException(); // ❌ Crashes enumeration
+    return x.Value;
+});
+
+// After (Code Fix Applied) - CORRECT
+var results = items.Select(x => {
+    try
+    {
+        if (x == null)
+            throw new ArgumentNullException();
+        return x.Value;
+    }
+    catch (ArgumentNullException ex)
+    {
+        Logger.LogError(ex, "Null item in collection");
+        return default;
+    }
+});
+```
+
+#### THROWS026: Event handler lambda exception
+**Severity:** Error | **Code Fix:** Wrap in try-catch
+
+Detects event handler lambdas that throw unhandled exceptions.
+
+```csharp
+// Before - WRONG (can crash app)
+button.Click += (sender, e) => {
+    throw new InvalidOperationException(); // ❌ Crashes app
+};
+
+// After (Code Fix Applied) - CORRECT
+button.Click += (sender, e) => {
+    try
+    {
+        ProcessClick();
+    }
+    catch (InvalidOperationException ex)
+    {
+        MessageBox.Show(ex.Message); // ✓ Handled gracefully
+    }
+};
+```
+
+### Category 6: Best Practices (4 rules)
+
+#### THROWS027: Exception used for control flow
+**Severity:** Info | **Code Fix:** Refactor to use return values
+
+Detects exceptions used for normal control flow instead of return values.
+
+```csharp
+// Before - WRONG (exception for control flow)
+try
+{
+    var user = FindUser(id);
+    if (user == null)
+        throw new UserNotFoundException(); // ❌ Expected condition
+}
+catch (UserNotFoundException)
+{
+    CreateDefaultUser(id);
+}
+
+// After (Code Fix Applied) - CORRECT
+var user = FindUser(id);
+if (user == null) // ✓ Return value check
+{
+    CreateDefaultUser(id);
+}
+```
+
+#### THROWS028: Custom exception naming violation
+**Severity:** Info | **Code Fix:** Rename exception
+
+Detects custom exception types not ending with "Exception".
+
+```csharp
+// Before - WRONG
+public class UserNotFound : Exception { } // ❌ Missing "Exception"
+
+// After (Code Fix Applied) - CORRECT
+public class UserNotFoundException : Exception { } // ✓ Follows convention
+```
+
+#### THROWS029: Exception in hot path
+**Severity:** Warning | **Code Fix:** Suggest refactoring
+
+Detects exceptions thrown inside loops (performance issue).
+
+```csharp
+// Before - WRONG (exception in loop)
+for (int i = 0; i < items.Count; i++)
+{
+    if (items[i] == null)
+        throw new ArgumentNullException(); // ❌ Performance issue
+    Process(items[i]);
+}
+
+// After (Code Fix Applied) - CORRECT
+// Validate before loop
+for (int i = 0; i < items.Count; i++)
+{
+    if (items[i] == null)
+        continue; // ✓ Or validate before loop starts
+    Process(items[i]);
+}
+```
+
+#### THROWS030: Consider Result pattern
+**Severity:** Info | **Code Fix:** Suggest Result<T>
+
+Suggests using Result<T> pattern for expected error conditions.
+
+```csharp
+// Before - Using exceptions for expected failures
+public User ParseUser(string data)
+{
+    if (string.IsNullOrEmpty(data))
+        throw new FormatException(); // Expected condition
+    return JsonSerializer.Deserialize<User>(data);
+}
+
+// After - Using Result<T> pattern (suggested)
+public Result<User> ParseUser(string data)
+{
+    if (string.IsNullOrEmpty(data))
+        return Result<User>.Failure("Data cannot be empty");
+
+    try
+    {
+        return Result<User>.Success(
+            JsonSerializer.Deserialize<User>(data));
+    }
+    catch (JsonException ex)
+    {
+        return Result<User>.Failure(ex.Message);
+    }
+}
+```
+
+## Examples and Samples
+
+For comprehensive examples demonstrating all diagnostics and code fixes, see:
+- [ExceptionPatterns Sample](samples/ExceptionPatterns/) - Demonstrates all 30 diagnostics
+- [LibraryManagement Sample](samples/LibraryManagement/) - Real-world library management system
 
 ## Building from Source
 
