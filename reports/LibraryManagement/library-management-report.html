@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThrowsAnalyzer Report - LibraryManagement</title>
+  <style>
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #34495e;
+      margin-top: 30px;
+      border-bottom: 2px solid #ecf0f1;
+      padding-bottom: 8px;
+    }
+    h3 {
+      color: #7f8c8d;
+      margin-top: 20px;
+    }
+    .metadata {
+      background: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .metadata p {
+      margin: 5px 0;
+    }
+    .status-success {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    .status-failed {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #3498db;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+    th:hover {
+      background: #2980b9;
+    }
+    th.sortable::after {
+      content: ' ⇅';
+      opacity: 0.3;
+    }
+    th.sorted-asc::after {
+      content: ' ▲';
+      opacity: 1;
+    }
+    th.sorted-desc::after {
+      content: ' ▼';
+      opacity: 1;
+    }
+    tr:hover {
+      background: #f8f9fa;
+    }
+    td:last-child, th:last-child {
+      text-align: right;
+    }
+    .diagnostic-card {
+      background: #f8f9fa;
+      border-left: 4px solid #3498db;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+    .diagnostic-error {
+      border-left-color: #e74c3c;
+    }
+    .diagnostic-warning {
+      border-left-color: #f39c12;
+    }
+    .diagnostic-info {
+      border-left-color: #3498db;
+    }
+    .diagnostic-hidden {
+      border-left-color: #95a5a6;
+    }
+    .diagnostic-card h4 {
+      margin-top: 0;
+      color: #2c3e50;
+    }
+    .diagnostic-meta {
+      color: #7f8c8d;
+      font-size: 0.9em;
+      margin: 10px 0;
+    }
+    .code-snippet {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      line-height: 1.4;
+      margin: 10px 0;
+    }
+    .severity-error {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .severity-warning {
+      color: #f39c12;
+      font-weight: bold;
+    }
+    .severity-info {
+      color: #3498db;
+      font-weight: bold;
+    }
+    .chart-container {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 5px;
+    }
+    canvas {
+      max-height: 400px;
+    }
+    .info {
+      background: #d6eaf8;
+      padding: 10px;
+      border-radius: 4px;
+      border-left: 4px solid #3498db;
+    }
+    .messages {
+      background: #fef5e7;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #f39c12;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #ecf0f1;
+      text-align: center;
+      color: #7f8c8d;
+      font-size: 0.9em;
+    }
+    code {
+      background: #ecf0f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    a {
+      color: #3498db;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  
+  </style>
+  <script>
+
+    function initSortableTables() {
+      const tables = document.querySelectorAll('table.sortable');
+      tables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        headers.forEach((header, index) => {
+          header.classList.add('sortable');
+          header.addEventListener('click', () => {
+            sortTable(table, index);
+          });
+        });
+      });
+    }
+
+    function sortTable(table, column) {
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const header = table.querySelectorAll('th')[column];
+      const isAsc = header.classList.contains('sorted-asc');
+
+      // Remove all sorting classes
+      table.querySelectorAll('th').forEach(h => {
+        h.classList.remove('sorted-asc', 'sorted-desc');
+      });
+
+      // Add new sorting class
+      header.classList.add(isAsc ? 'sorted-desc' : 'sorted-asc');
+
+      rows.sort((a, b) => {
+        const aText = a.cells[column].textContent.trim();
+        const bText = b.cells[column].textContent.trim();
+
+        // Try to parse as numbers
+        const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return isAsc ? bNum - aNum : aNum - bNum;
+        }
+
+        // Compare as strings
+        return isAsc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+    }
+  
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>ThrowsAnalyzer Report: LibraryManagement</h1>
+    <div class="metadata">
+      <p><strong>Analysis Date:</strong> 2025-10-27 13:39:58</p>
+      <p><strong>Target:</strong> Project - <code>/Users/wieslawsoltes/GitHub/ThrowsAnalyzer/samples/LibraryManagement/LibraryManagement.csproj</code></p>
+      <p><strong>Configuration:</strong> Debug</p>
+      <p><strong>Duration:</strong> 2.18s</p>
+      <p><strong>Status:</strong> <span class="status-success">✓ Success</span></p>
+    </div>
+    <h2>Summary</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Metric</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Total Diagnostics</td><td>51</td></tr>
+        <tr><td>Errors</td><td class="severity-error">0</td></tr>
+        <tr><td>Warnings</td><td class="severity-warning">25</td></tr>
+        <tr><td>Info/Hidden</td><td>26</td></tr>
+        <tr><td>Projects Analyzed</td><td>1</td></tr>
+        <tr><td>Files Analyzed</td><td>3</td></tr>
+      </tbody>
+    </table>
+    <h2>Diagnostics by ID</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Diagnostic ID</th><th>Count</th><th>Percentage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>THROWS029</td><td>10</td><td>19.6%</td></tr>
+        <tr><td>THROWS001</td><td>8</td><td>15.7%</td></tr>
+        <tr><td>THROWS002</td><td>8</td><td>15.7%</td></tr>
+        <tr><td>THROWS017</td><td>8</td><td>15.7%</td></tr>
+        <tr><td>THROWS019</td><td>6</td><td>11.8%</td></tr>
+        <tr><td>THROWS030</td><td>5</td><td>9.8%</td></tr>
+        <tr><td>THROWS010</td><td>3</td><td>5.9%</td></tr>
+        <tr><td>THROWS003</td><td>3</td><td>5.9%</td></tr>
+      </tbody>
+    </table>
+    <h2>Diagnostics by Severity</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>Severity</th><th>Count</th><th>Percentage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="severity-info">Info</td><td>26</td><td>51.0%</td></tr>
+        <tr><td class="severity-warning">Warning</td><td>25</td><td>49.0%</td></tr>
+      </tbody>
+    </table>
+    <h2>Top 20 Files with Most Diagnostics</h2>
+    <table class="sortable">
+      <thead>
+        <tr><th>File</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>LibraryService.cs</code></td><td>35</td></tr>
+        <tr><td><code>Member.cs</code></td><td>13</td></tr>
+        <tr><td><code>Book.cs</code></td><td>3</td></tr>
+      </tbody>
+    </table>
+    <h2>Detailed Diagnostics</h2>
+    <h3>Book.cs</h3>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 11, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;Book()&#39; may throw ArgumentException and ArgumentOutOfRangeException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>       8:     public int YearPublished { get; }
+       9:     public bool IsAvailable { get; private set; }
+      10: 
+&gt;&gt;&gt;   11:     public Book(string isbn, string title, string author, int yearPublished)
+      12:     {
+      13:         if (string.IsNullOrWhiteSpace(isbn))
+      14:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 11, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Book&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>       8:     public int YearPublished { get; }
+       9:     public bool IsAvailable { get; private set; }
+      10: 
+&gt;&gt;&gt;   11:     public Book(string isbn, string title, string author, int yearPublished)
+      12:     {
+      13:         if (string.IsNullOrWhiteSpace(isbn))
+      14:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 11, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Book&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>       8:     public int YearPublished { get; }
+       9:     public bool IsAvailable { get; private set; }
+      10: 
+&gt;&gt;&gt;   11:     public Book(string isbn, string title, string author, int yearPublished)
+      12:     {
+      13:         if (string.IsNullOrWhiteSpace(isbn))
+      14:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <h3>LibraryService.cs</h3>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 58, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;LibraryService.CheckOutBookToMember&#39; may throw KeyNotFoundException, InvalidOperationException and ArgumentException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>      55: 
+      56:     // LEVEL 1: Top-level method that orchestrates checkout
+      57:     // Calls Level 2 method
+&gt;&gt;&gt;   58:     public void CheckOutBookToMember(string isbn, string memberId)
+      59:     {
+      60:         // Call Level 2 - validation method
+      61:         ValidateCheckout(isbn, memberId);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 61, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateCheckout&#39; which may throw KeyNotFoundException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>      58:     public void CheckOutBookToMember(string isbn, string memberId)
+      59:     {
+      60:         // Call Level 2 - validation method
+&gt;&gt;&gt;   61:         ValidateCheckout(isbn, memberId);
+      62: 
+      63:         var book = _books[isbn];
+      64:         var member = _members[memberId];</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 67, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;Member.CheckOutBook&#39; which may throw ArgumentException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>      64:         var member = _members[memberId];
+      65: 
+      66:         // Perform checkout
+&gt;&gt;&gt;   67:         member.CheckOutBook(isbn);
+      68:         book.MarkAsCheckedOut();
+      69:     }
+      70: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 76, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateBookAvailability&#39; which may throw KeyNotFoundException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>      73:     private void ValidateCheckout(string isbn, string memberId)
+      74:     {
+      75:         // Call Level 3 validation methods
+&gt;&gt;&gt;   76:         ValidateBookAvailability(isbn);
+      77:         ValidateMemberEligibility(memberId);
+      78:     }
+      79: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 77, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateMemberEligibility&#39; which may throw KeyNotFoundException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>      74:     {
+      75:         // Call Level 3 validation methods
+      76:         ValidateBookAvailability(isbn);
+&gt;&gt;&gt;   77:         ValidateMemberEligibility(memberId);
+      78:     }
+      79: 
+      80:     // LEVEL 3: Specific validation with throws</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 81, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateBookAvailability&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      78:     }
+      79: 
+      80:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   81:     private void ValidateBookAvailability(string isbn)
+      82:     {
+      83:         if (!_books.ContainsKey(isbn))
+      84:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS030: Consider using Result&lt;T&gt; pattern for expected errors</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 81, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;ValidateBookAvailability&#39; throws &#39;System.Collections.Generic.KeyNotFoundException, System.InvalidOperationException&#39; for expected validation - consider using Result&lt;T&gt; pattern</p>
+      <div class="code-snippet">
+<pre>      78:     }
+      79: 
+      80:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   81:     private void ValidateBookAvailability(string isbn)
+      82:     {
+      83:         if (!_books.ContainsKey(isbn))
+      84:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 81, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateBookAvailability&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      78:     }
+      79: 
+      80:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   81:     private void ValidateBookAvailability(string isbn)
+      82:     {
+      83:         if (!_books.ContainsKey(isbn))
+      84:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 84, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.Collections.Generic.KeyNotFoundException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      81:     private void ValidateBookAvailability(string isbn)
+      82:     {
+      83:         if (!_books.ContainsKey(isbn))
+&gt;&gt;&gt;   84:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found&quot;);
+      85: 
+      86:         var book = _books[isbn];
+      87:         if (!book.IsAvailable)</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 88, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      85: 
+      86:         var book = _books[isbn];
+      87:         if (!book.IsAvailable)
+&gt;&gt;&gt;   88:             throw new InvalidOperationException($&quot;Book &#39;{book.Title}&#39; is currently checked out&quot;);
+      89:     }
+      90: 
+      91:     // LEVEL 3: Specific validation with throws</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 92, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateMemberEligibility&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      89:     }
+      90: 
+      91:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   92:     private void ValidateMemberEligibility(string memberId)
+      93:     {
+      94:         if (!_members.ContainsKey(memberId))
+      95:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS030: Consider using Result&lt;T&gt; pattern for expected errors</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 92, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;ValidateMemberEligibility&#39; throws &#39;System.Collections.Generic.KeyNotFoundException, System.InvalidOperationException&#39; for expected validation - consider using Result&lt;T&gt; pattern</p>
+      <div class="code-snippet">
+<pre>      89:     }
+      90: 
+      91:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   92:     private void ValidateMemberEligibility(string memberId)
+      93:     {
+      94:         if (!_members.ContainsKey(memberId))
+      95:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 92, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateMemberEligibility&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      89:     }
+      90: 
+      91:     // LEVEL 3: Specific validation with throws
+&gt;&gt;&gt;   92:     private void ValidateMemberEligibility(string memberId)
+      93:     {
+      94:         if (!_members.ContainsKey(memberId))
+      95:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 95, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.Collections.Generic.KeyNotFoundException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      92:     private void ValidateMemberEligibility(string memberId)
+      93:     {
+      94:         if (!_members.ContainsKey(memberId))
+&gt;&gt;&gt;   95:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);
+      96: 
+      97:         var member = _members[memberId];
+      98:         if (!member.CanCheckOutMoreBooks())</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 99, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      96: 
+      97:         var member = _members[memberId];
+      98:         if (!member.CanCheckOutMoreBooks())
+&gt;&gt;&gt;   99:             throw new InvalidOperationException($&quot;Member &#39;{member.Name}&#39; has reached the maximum book limit&quot;);
+     100:     }
+     101: 
+     102:     // Another 3-level hierarchy for returns</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 104, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;LibraryService.ReturnBookFromMember&#39; may throw KeyNotFoundException, InvalidOperationException and ArgumentException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>     101: 
+     102:     // Another 3-level hierarchy for returns
+     103:     // LEVEL 1: Top-level return method
+&gt;&gt;&gt;  104:     public void ReturnBookFromMember(string isbn, string memberId)
+     105:     {
+     106:         // Call Level 2
+     107:         ValidateReturn(isbn, memberId);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 107, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateReturn&#39; which may throw KeyNotFoundException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>     104:     public void ReturnBookFromMember(string isbn, string memberId)
+     105:     {
+     106:         // Call Level 2
+&gt;&gt;&gt;  107:         ValidateReturn(isbn, memberId);
+     108: 
+     109:         var book = _books[isbn];
+     110:         var member = _members[memberId];</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 113, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;Member.ReturnBook&#39; which may throw ArgumentException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>     110:         var member = _members[memberId];
+     111: 
+     112:         // Perform return
+&gt;&gt;&gt;  113:         member.ReturnBook(isbn);
+     114:         book.MarkAsReturned();
+     115:     }
+     116: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 121, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateBookExists&#39; which may throw KeyNotFoundException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>     118:     private void ValidateReturn(string isbn, string memberId)
+     119:     {
+     120:         // Call Level 3
+&gt;&gt;&gt;  121:         ValidateBookExists(isbn);
+     122:         ValidateMemberHasBook(memberId, isbn);
+     123:     }
+     124: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS017: Method calls throwing method without handling</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 122, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method calls &#39;LibraryService.ValidateMemberHasBook&#39; which may throw KeyNotFoundException or InvalidOperationException, but does not handle it</p>
+      <div class="code-snippet">
+<pre>     119:     {
+     120:         // Call Level 3
+     121:         ValidateBookExists(isbn);
+&gt;&gt;&gt;  122:         ValidateMemberHasBook(memberId, isbn);
+     123:     }
+     124: 
+     125:     // LEVEL 3: Validation with throws</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 126, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateBookExists&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     123:     }
+     124: 
+     125:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  126:     private void ValidateBookExists(string isbn)
+     127:     {
+     128:         if (!_books.ContainsKey(isbn))
+     129:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found in library&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS030: Consider using Result&lt;T&gt; pattern for expected errors</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 126, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;ValidateBookExists&#39; throws &#39;System.Collections.Generic.KeyNotFoundException&#39; for expected validation - consider using Result&lt;T&gt; pattern</p>
+      <div class="code-snippet">
+<pre>     123:     }
+     124: 
+     125:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  126:     private void ValidateBookExists(string isbn)
+     127:     {
+     128:         if (!_books.ContainsKey(isbn))
+     129:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found in library&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 126, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateBookExists&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     123:     }
+     124: 
+     125:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  126:     private void ValidateBookExists(string isbn)
+     127:     {
+     128:         if (!_books.ContainsKey(isbn))
+     129:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found in library&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 129, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.Collections.Generic.KeyNotFoundException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>     126:     private void ValidateBookExists(string isbn)
+     127:     {
+     128:         if (!_books.ContainsKey(isbn))
+&gt;&gt;&gt;  129:             throw new KeyNotFoundException($&quot;Book with ISBN {isbn} not found in library&quot;);
+     130:     }
+     131: 
+     132:     // LEVEL 3: Validation with throws</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 133, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateMemberHasBook&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>     130:     }
+     131: 
+     132:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  133:     private void ValidateMemberHasBook(string memberId, string isbn)
+     134:     {
+     135:         if (!_members.ContainsKey(memberId))
+     136:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS030: Consider using Result&lt;T&gt; pattern for expected errors</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 133, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;ValidateMemberHasBook&#39; throws &#39;System.Collections.Generic.KeyNotFoundException, System.InvalidOperationException&#39; for expected validation - consider using Result&lt;T&gt; pattern</p>
+      <div class="code-snippet">
+<pre>     130:     }
+     131: 
+     132:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  133:     private void ValidateMemberHasBook(string memberId, string isbn)
+     134:     {
+     135:         if (!_members.ContainsKey(memberId))
+     136:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 133, Column 18 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ValidateMemberHasBook&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>     130:     }
+     131: 
+     132:     // LEVEL 3: Validation with throws
+&gt;&gt;&gt;  133:     private void ValidateMemberHasBook(string memberId, string isbn)
+     134:     {
+     135:         if (!_members.ContainsKey(memberId))
+     136:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 136, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.Collections.Generic.KeyNotFoundException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>     133:     private void ValidateMemberHasBook(string memberId, string isbn)
+     134:     {
+     135:         if (!_members.ContainsKey(memberId))
+&gt;&gt;&gt;  136:             throw new KeyNotFoundException($&quot;Member with ID {memberId} not found&quot;);
+     137: 
+     138:         var member = _members[memberId];
+     139:         if (!member.CheckedOutBooks.Contains(isbn))</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 140, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>     137: 
+     138:         var member = _members[memberId];
+     139:         if (!member.CheckedOutBooks.Contains(isbn))
+&gt;&gt;&gt;  140:             throw new InvalidOperationException($&quot;Member &#39;{member.Name}&#39; does not have this book checked out&quot;);
+     141:     }
+     142: 
+     143:     // Method without throws - just generates report</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 161, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;TryCheckOutBookToMember&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     158: 
+     159:     // Method with try-catch blocks (demonstrates THROWS003)
+     160:     // This method handles exceptions gracefully instead of propagating them
+&gt;&gt;&gt;  161:     public bool TryCheckOutBookToMember(string isbn, string memberId, out string? errorMessage)
+     162:     {
+     163:         errorMessage = null;
+     164: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 188, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;TryCheckOutBookToMember&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>     185:             errorMessage = $&quot;Invalid operation: {ex.Message}&quot;;
+     186:             return false;
+     187:         }
+&gt;&gt;&gt;  188:         catch (Exception ex)
+     189:         {
+     190:             errorMessage = $&quot;Unexpected error: {ex.Message}&quot;;
+     191:             return false;</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 196, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;TryReturnBookFromMember&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     193:     }
+     194: 
+     195:     // Another method with try-catch for return operations (demonstrates THROWS003)
+&gt;&gt;&gt;  196:     public bool TryReturnBookFromMember(string isbn, string memberId, out string? errorMessage)
+     197:     {
+     198:         errorMessage = null;
+     199: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 222, Column 9 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;TryReturnBookFromMember&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>     219:             errorMessage = $&quot;Invalid operation: {ex.Message}&quot;;
+     220:             return false;
+     221:         }
+&gt;&gt;&gt;  222:         catch (Exception ex)
+     223:         {
+     224:             errorMessage = $&quot;Unexpected error: {ex.Message}&quot;;
+     225:             return false;</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS003: Method contains try/catch block</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 230, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;BatchCheckoutBooks&#39;&#39; contains try/catch block(s)</p>
+      <div class="code-snippet">
+<pre>     227:     }
+     228: 
+     229:     // Method with nested try-catch blocks (demonstrates THROWS003)
+&gt;&gt;&gt;  230:     public void BatchCheckoutBooks(string memberId, List&lt;string&gt; isbns)
+     231:     {
+     232:         var successfulCheckouts = new List&lt;string&gt;();
+     233: </pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS010: Overly broad exception catch</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 272, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;BatchCheckoutBooks&#39;&#39; catches &#39;System.Exception&#39; which is too broad - consider catching specific exception types</p>
+      <div class="code-snippet">
+<pre>     269:                     member.ReturnBook(isbn);
+     270:                     book.MarkAsReturned();
+     271:                 }
+&gt;&gt;&gt;  272:                 catch (Exception rollbackEx)
+     273:                 {
+     274:                     Console.WriteLine($&quot;Rollback failed for {isbn}: {rollbackEx.Message}&quot;);
+     275:                 }</pre>
+      </div>
+    </div>
+    <h3>Member.cs</h3>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 12, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;Member()&#39; may throw ArgumentException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>       9:     public List&lt;string&gt; CheckedOutBooks { get; }
+      10:     public const int MaxBooksAllowed = 5;
+      11: 
+&gt;&gt;&gt;   12:     public Member(string memberId, string name, string email)
+      13:     {
+      14:         if (string.IsNullOrWhiteSpace(memberId))
+      15:             throw new ArgumentException(&quot;Member ID cannot be empty&quot;, nameof(memberId));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 12, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Member&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>       9:     public List&lt;string&gt; CheckedOutBooks { get; }
+      10:     public const int MaxBooksAllowed = 5;
+      11: 
+&gt;&gt;&gt;   12:     public Member(string memberId, string name, string email)
+      13:     {
+      14:         if (string.IsNullOrWhiteSpace(memberId))
+      15:             throw new ArgumentException(&quot;Member ID cannot be empty&quot;, nameof(memberId));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 12, Column 12 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Constructor &#39;Member&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>       9:     public List&lt;string&gt; CheckedOutBooks { get; }
+      10:     public const int MaxBooksAllowed = 5;
+      11: 
+&gt;&gt;&gt;   12:     public Member(string memberId, string name, string email)
+      13:     {
+      14:         if (string.IsNullOrWhiteSpace(memberId))
+      15:             throw new ArgumentException(&quot;Member ID cannot be empty&quot;, nameof(memberId));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 31, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;Member.CheckOutBook&#39; may throw ArgumentException and InvalidOperationException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>      28:     }
+      29: 
+      30:     // Method with throw
+&gt;&gt;&gt;   31:     public void CheckOutBook(string isbn)
+      32:     {
+      33:         if (string.IsNullOrWhiteSpace(isbn))
+      34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 31, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;CheckOutBook&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      28:     }
+      29: 
+      30:     // Method with throw
+&gt;&gt;&gt;   31:     public void CheckOutBook(string isbn)
+      32:     {
+      33:         if (string.IsNullOrWhiteSpace(isbn))
+      34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS030: Consider using Result&lt;T&gt; pattern for expected errors</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 31, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;CheckOutBook&#39; throws &#39;System.ArgumentException, System.InvalidOperationException&#39; for expected validation - consider using Result&lt;T&gt; pattern</p>
+      <div class="code-snippet">
+<pre>      28:     }
+      29: 
+      30:     // Method with throw
+&gt;&gt;&gt;   31:     public void CheckOutBook(string isbn)
+      32:     {
+      33:         if (string.IsNullOrWhiteSpace(isbn))
+      34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 31, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;CheckOutBook&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      28:     }
+      29: 
+      30:     // Method with throw
+&gt;&gt;&gt;   31:     public void CheckOutBook(string isbn)
+      32:     {
+      33:         if (string.IsNullOrWhiteSpace(isbn))
+      34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 34, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.ArgumentException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      31:     public void CheckOutBook(string isbn)
+      32:     {
+      33:         if (string.IsNullOrWhiteSpace(isbn))
+&gt;&gt;&gt;   34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));
+      35: 
+      36:         if (CheckedOutBooks.Count &gt;= MaxBooksAllowed)
+      37:             throw new InvalidOperationException($&quot;Member has reached maximum books limit of {MaxBooksAllowed}&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 37, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      34:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));
+      35: 
+      36:         if (CheckedOutBooks.Count &gt;= MaxBooksAllowed)
+&gt;&gt;&gt;   37:             throw new InvalidOperationException($&quot;Member has reached maximum books limit of {MaxBooksAllowed}&quot;);
+      38: 
+      39:         if (CheckedOutBooks.Contains(isbn))
+      40:             throw new InvalidOperationException(&quot;Book is already checked out by this member&quot;);</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS029: Exception thrown in potential hot path</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 40, Column 13 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Exception &#39;System.InvalidOperationException&#39; is thrown in validation method (consider returning bool) - consider performance implications</p>
+      <div class="code-snippet">
+<pre>      37:             throw new InvalidOperationException($&quot;Member has reached maximum books limit of {MaxBooksAllowed}&quot;);
+      38: 
+      39:         if (CheckedOutBooks.Contains(isbn))
+&gt;&gt;&gt;   40:             throw new InvalidOperationException(&quot;Book is already checked out by this member&quot;);
+      41: 
+      42:         CheckedOutBooks.Add(isbn);
+      43:     }</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS019: Public API throws undocumented exception</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 46, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Public method &#39;Member.ReturnBook&#39; may throw ArgumentException and InvalidOperationException, but it is not documented</p>
+      <div class="code-snippet">
+<pre>      43:     }
+      44: 
+      45:     // Method with throw
+&gt;&gt;&gt;   46:     public void ReturnBook(string isbn)
+      47:     {
+      48:         if (string.IsNullOrWhiteSpace(isbn))
+      49:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-info">
+      <h4>THROWS001: Method contains throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-info">Severity: Info</span> | 
+        Location: Line 46, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ReturnBook&#39;&#39; contains throw statement(s)</p>
+      <div class="code-snippet">
+<pre>      43:     }
+      44: 
+      45:     // Method with throw
+&gt;&gt;&gt;   46:     public void ReturnBook(string isbn)
+      47:     {
+      48:         if (string.IsNullOrWhiteSpace(isbn))
+      49:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="diagnostic-card diagnostic-warning">
+      <h4>THROWS002: Method contains unhandled throw statement</h4>
+      <div class="diagnostic-meta">
+        <span class="severity-warning">Severity: Warning</span> | 
+        Location: Line 46, Column 17 | 
+        Project: LibraryManagement
+      </div>
+      <p><strong>Message:</strong> Method &#39;Method &#39;ReturnBook&#39;&#39; contains throw statement(s) without try/catch handling</p>
+      <div class="code-snippet">
+<pre>      43:     }
+      44: 
+      45:     // Method with throw
+&gt;&gt;&gt;   46:     public void ReturnBook(string isbn)
+      47:     {
+      48:         if (string.IsNullOrWhiteSpace(isbn))
+      49:             throw new ArgumentException(&quot;ISBN cannot be empty&quot;, nameof(isbn));</pre>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Generated by ThrowsAnalyzer CLI on 2025-10-27 13:40:01</p>
+      <p><a href="https://github.com/wieslawsoltes/ThrowsAnalyzer" target="_blank">ThrowsAnalyzer on GitHub</a></p>
+    </div>
+  </div>
+  <script>initSortableTables();</script>
+</body>
+</html>
