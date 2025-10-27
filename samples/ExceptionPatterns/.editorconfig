@@ -2,7 +2,11 @@
 # ThrowsAnalyzer Sample - .editorconfig
 # ========================================
 # This configuration makes all 30 ThrowsAnalyzer diagnostics
-# visible during build for demonstration purposes
+# visible during build for demonstration purposes.
+#
+# NOTE: All diagnostics are set to 'warning' (not 'error') to allow
+# the sample project to build successfully. In production code, you
+# should set critical diagnostics (THROWS004, 021, 026) to 'error'.
 # ========================================
 
 [*.cs]
@@ -21,7 +25,8 @@ dotnet_diagnostic.THROWS002.severity = warning
 dotnet_diagnostic.THROWS003.severity = warning
 
 # THROWS004: Rethrow anti-pattern (throw ex; instead of throw;)
-dotnet_diagnostic.THROWS004.severity = error
+# NOTE: Set to 'warning' for sample - use 'error' in production!
+dotnet_diagnostic.THROWS004.severity = warning
 
 # THROWS007: Unreachable catch clause due to ordering
 dotnet_diagnostic.THROWS007.severity = warning
@@ -56,7 +61,8 @@ dotnet_diagnostic.THROWS019.severity = warning
 dotnet_diagnostic.THROWS020.severity = warning
 
 # THROWS021: Async void exception (CRITICAL - can crash app)
-dotnet_diagnostic.THROWS021.severity = error
+# NOTE: Set to 'warning' for sample - use 'error' in production!
+dotnet_diagnostic.THROWS021.severity = warning
 
 # THROWS022: Unobserved Task exception
 dotnet_diagnostic.THROWS022.severity = warning
@@ -79,7 +85,8 @@ dotnet_diagnostic.THROWS024.severity = suggestion
 dotnet_diagnostic.THROWS025.severity = warning
 
 # THROWS026: Event handler lambda exception (CRITICAL - can crash app)
-dotnet_diagnostic.THROWS026.severity = error
+# NOTE: Set to 'warning' for sample - use 'error' in production!
+dotnet_diagnostic.THROWS026.severity = warning
 
 # ----------------------------------------
 # Category 6: Best Practices (THROWS027-030)
