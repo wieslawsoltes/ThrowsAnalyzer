@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using ThrowsAnalyzer.Analysis;
+using CoreAsyncDetector = RoslynAnalyzer.Core.Analysis.Patterns.Async.AsyncMethodDetector;
 
 namespace ThrowsAnalyzer.Analyzers
 {
@@ -65,12 +66,12 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Get method body
-            var body = AsyncMethodDetector.GetMethodBody(context.Node);
+            var body = CoreAsyncDetector.GetMethodBody(context.Node);
             if (body == null)
                 return;
 
             // Find unawaited task invocations
-            var unawaitedInvocations = AsyncMethodDetector.GetUnawaitedTaskInvocations(
+            var unawaitedInvocations = CoreAsyncDetector.GetUnawaitedTaskInvocations(
                 body,
                 context.SemanticModel);
 

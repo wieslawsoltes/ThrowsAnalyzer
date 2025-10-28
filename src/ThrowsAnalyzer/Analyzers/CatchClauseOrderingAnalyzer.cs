@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using ThrowsAnalyzer.Core;
+using RoslynAnalyzer.Core.Members;
 using ThrowsAnalyzer.TypeAnalysis;
 
 namespace ThrowsAnalyzer

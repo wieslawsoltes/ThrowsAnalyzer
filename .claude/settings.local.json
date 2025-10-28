@@ -23,7 +23,14 @@
       "Bash(xargs:*)",
       "Bash(cat:*)",
       "Bash(sort:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Read(//Users/wieslawsoltes/Downloads/AvaloniaApplicationTestExc/AvaloniaApplicationTestExc/**)",
+      "Bash(find:*)",
+      "Bash(git checkout:*)",
+      "Bash(for file in src/ThrowsAnalyzer/Analyzers/AsyncVoidThrowAnalyzer.cs src/ThrowsAnalyzer/Analyzers/UnobservedTaskExceptionAnalyzer.cs)",
+      "Bash(do echo \"=== $file ===\" grep \"AsyncMethodDetector\\.\" \"$file\")",
+      "mcp__ide__getDiagnostics",
+      "Read(//Users/wieslawsoltes/.nuget/packages/throwsanalyzer/1.0.0-beta.1/**)"
     ],
     "deny": [],
     "ask": []

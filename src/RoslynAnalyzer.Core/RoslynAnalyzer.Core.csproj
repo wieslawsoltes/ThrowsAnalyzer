@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet Package Configuration -->
+    <IsPackable>true</IsPackable>
+    <PackageId>RoslynAnalyzer.Core</PackageId>
+    <Title>RoslynAnalyzer.Core - Reusable Roslyn Analyzer Infrastructure</Title>
+    <Description>
+A reusable infrastructure library for building Roslyn analyzers and code fix providers.
+Extracted from the ThrowsAnalyzer project, this library provides battle-tested components for:
+
+• Call graph analysis and method invocation tracking
+• Executable member detection (methods, constructors, properties, lambdas, etc.)
+• Async/await pattern detection
+• Iterator (yield) pattern detection
+• Lambda expression analysis
+• Type hierarchy and interface analysis
+• Configuration and suppression infrastructure (.editorconfig support)
+• Performance optimizations (caching with statistics)
+
+Perfect for: Building custom Roslyn analyzers, code quality tools, and static analysis frameworks.
+    </Description>
+    <Summary>Reusable infrastructure for building Roslyn analyzers with call graph analysis, member detection, async/iterator/lambda patterns, and more.</Summary>
+    <Authors>Wiesław Šoltés</Authors>
+    <Owners>Wiesław Šoltés</Owners>
+    <Copyright>Copyright © 2025 Wiesław Šoltés</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>roslyn;analyzer;csharp;infrastructure;call-graph;async;iterator;lambda;code-analysis;static-analysis;sdk;toolkit</PackageTags>
+    <PackageReleaseNotes>
+v1.0.0 - Initial Release
+• Call graph analysis with cycle detection and transitive operations
+• Executable member detection for all C# member types (methods, constructors, properties, lambdas, local functions, etc.)
+• Async/await pattern detection (AsyncMethodDetector, AsyncMethodInfo)
+• Iterator (yield) pattern detection (IteratorMethodDetector, IteratorMethodInfo)
+• Lambda expression analysis (LambdaDetector with context detection)
+• Type hierarchy analysis (TypeHierarchyAnalyzer with interface checking)
+• Generic flow analysis pattern (IFlowInfo, IFlowAnalyzer, FlowAnalyzerBase)
+• Configuration infrastructure (AnalyzerOptionsReader with .editorconfig support)
+• Suppression infrastructure (SuppressionHelper with custom attribute support)
+• Performance optimization components (CompilationCache, SymbolCache with statistics)
+• Diagnostic helpers for accurate source locations
+• Successfully integrated into ThrowsAnalyzer (274 tests passing, zero regressions)
+• Comprehensive README with quick starts, API reference, and real-world examples
+• 187 comprehensive unit tests (100% pass rate)
+• Full XML documentation
+    </PackageReleaseNotes>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" />
+  </ItemGroup>
+
+</Project>

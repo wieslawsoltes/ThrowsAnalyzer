@@ -1,11 +1,24 @@
 # ThrowsAnalyzer
 
-[![CI](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml)
-[![NuGet](https://img.shields.io/nuget/v/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer)
+A Roslyn-based C# analyzer that detects exception handling patterns in your code. ThrowsAnalyzer helps identify throw statements, unhandled exceptions, and try-catch blocks across all executable member types.
+
+## Build Status & NuGet Packages
+
+| Package | Version | Downloads | Build |
+|---------|---------|-----------|-------|
+| **ThrowsAnalyzer** | [![NuGet](https://img.shields.io/nuget/v/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer) | [![NuGet Downloads](https://img.shields.io/nuget/dt/ThrowsAnalyzer.svg)](https://www.nuget.org/packages/ThrowsAnalyzer) | [![CI](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml) |
+| **ThrowsAnalyzer.Cli** | [![NuGet](https://img.shields.io/nuget/v/ThrowsAnalyzer.Cli.svg)](https://www.nuget.org/packages/ThrowsAnalyzer.Cli) | [![NuGet Downloads](https://img.shields.io/nuget/dt/ThrowsAnalyzer.Cli.svg)](https://www.nuget.org/packages/ThrowsAnalyzer.Cli) | [![CI](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml) |
+| **RoslynAnalyzer.Core** | [![NuGet](https://img.shields.io/nuget/v/RoslynAnalyzer.Core.svg)](https://www.nuget.org/packages/RoslynAnalyzer.Core) | [![NuGet Downloads](https://img.shields.io/nuget/dt/RoslynAnalyzer.Core.svg)](https://www.nuget.org/packages/RoslynAnalyzer.Core) | [![CI](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/wieslawsoltes/ThrowsAnalyzer/actions/workflows/ci.yml) |
+
 [![License](https://img.shields.io/github/license/wieslawsoltes/ThrowsAnalyzer.svg)](LICENSE)
 
-A Roslyn-based C# analyzer that detects exception handling patterns in your code. ThrowsAnalyzer helps identify throw statements, unhandled exceptions, and try-catch blocks across all executable member types.
+## Repository Contents
+
+This repository includes three packages:
+
+- **[ThrowsAnalyzer](#throwsanalyzer-1)** - Comprehensive exception analysis with 30 diagnostics and 16 code fixes
+- **[ThrowsAnalyzer.Cli](#cli-tool)** - Command-line tool for analyzing projects and generating reports
+- **[RoslynAnalyzer.Core](#roslynanalyzercore)** - Reusable infrastructure for building custom Roslyn analyzers
 
 ## Features
 
@@ -771,15 +784,114 @@ For comprehensive examples demonstrating all diagnostics and code fixes, see:
 - [ExceptionPatterns Sample](samples/ExceptionPatterns/) - Demonstrates all 30 diagnostics
 - [LibraryManagement Sample](samples/LibraryManagement/) - Real-world library management system
 
+## RoslynAnalyzer.Core
+
+RoslynAnalyzer.Core is a reusable infrastructure library extracted from ThrowsAnalyzer for building custom Roslyn analyzers. It provides battle-tested components for common analyzer patterns.
+
+### Installation
+
+```bash
+dotnet add package RoslynAnalyzer.Core
+```
+
+### Features
+
+- **Call Graph Analysis** - Track method invocations with cycle detection and transitive operations
+- **Executable Member Detection** - Identify all C# member types (methods, constructors, properties, lambdas, local functions, etc.)
+- **Async/Await Pattern Detection** - Analyze async methods, detect async void, find awaits, and identify unawaited tasks
+- **Iterator Pattern Detection** - Detect yield-based iterators, find yield statements, and analyze iterator flow
+- **Lambda Expression Analysis** - Generic lambda detection with context identification (event handlers, LINQ, Task.Run, callbacks)
+- **Type Hierarchy Analysis** - Navigate type hierarchies and check interface implementations
+- **Configuration Infrastructure** - Read .editorconfig settings for analyzer customization
+- **Suppression Infrastructure** - Support custom suppression attributes
+- **Performance Optimizations** - Compilation and symbol caching with statistics
+
+### Quick Start
+
+```csharp
+using RoslynAnalyzer.Core.Analysis.Patterns.Async;
+using RoslynAnalyzer.Core.Analysis.Patterns.Iterators;
+using RoslynAnalyzer.Core.Analysis.Patterns.Lambda;
+
+// Async pattern detection
+var asyncInfo = AsyncMethodDetector.GetAsyncMethodInfo(methodSymbol, methodNode, semanticModel);
+if (asyncInfo.IsAsyncVoid)
+{
+    // Handle async void pattern
+}
+
+// Iterator pattern detection
+if (IteratorMethodDetector.IsIteratorMethod(methodSymbol, methodNode))
+{
+    var yieldStatements = IteratorMethodDetector.GetYieldStatements(methodBody);
+    // Analyze iterator pattern
+}
+
+// Lambda pattern detection
+var lambdas = LambdaDetector.GetLambdaExpressions(methodBody);
+foreach (var lambda in lambdas)
+{
+    var context = LambdaDetector.GetLambdaContext(lambda, semanticModel);
+    if (context == LambdaContext.EventHandler)
+    {
+        // Handle event handler lambda
+    }
+}
+```
+
+### Documentation
+
+For complete API reference, examples, and usage guides, see the [RoslynAnalyzer.Core README](src/RoslynAnalyzer.Core/README.md).
+
+### Real-World Example
+
+ThrowsAnalyzer itself is built using RoslynAnalyzer.Core, providing a comprehensive real-world example of how to use the library to build production-ready analyzers.
+
 ## Building from Source
 
 ```bash
-# Build the analyzer
-dotnet build src/ThrowsAnalyzer/ThrowsAnalyzer.csproj
+# Clone the repository
+git clone https://github.com/wieslawsoltes/ThrowsAnalyzer.git
+cd ThrowsAnalyzer
 
-# Run tests
+# Build everything
+dotnet build
+
+# Run all tests (461 tests)
+dotnet test
+
+# Build individual projects
+dotnet build src/ThrowsAnalyzer/ThrowsAnalyzer.csproj
+dotnet build src/RoslynAnalyzer.Core/RoslynAnalyzer.Core.csproj
+
+# Run specific test projects
 dotnet test tests/ThrowsAnalyzer.Tests/ThrowsAnalyzer.Tests.csproj
+dotnet test tests/RoslynAnalyzer.Core.Tests/RoslynAnalyzer.Core.Tests.csproj
+
+# Create NuGet packages
+dotnet pack -c Release -o nupkg
 ```
+
+## Project Structure
+
+```
+ThrowsAnalyzer/
+├── src/
+│   ├── ThrowsAnalyzer/           # Main analyzer with 30 diagnostics and 16 code fixes
+│   ├── ThrowsAnalyzer.Cli/       # Command-line tool for project analysis
+│   └── RoslynAnalyzer.Core/      # Reusable infrastructure library
+├── tests/
+│   ├── ThrowsAnalyzer.Tests/     # 274 tests for ThrowsAnalyzer
+│   └── RoslynAnalyzer.Core.Tests/ # 187 tests for RoslynAnalyzer.Core
+├── samples/
+│   ├── ExceptionPatterns/        # Demonstrates all 30 diagnostics
+│   └── LibraryManagement/        # Real-world example application
+└── docs/                         # Documentation and guides
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
 ## License
 

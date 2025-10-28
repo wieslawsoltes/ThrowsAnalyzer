@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ThrowsAnalyzer\ThrowsAnalyzer.csproj" />
+    <ProjectReference Include="..\..\src\RoslynAnalyzer.Core\RoslynAnalyzer.Core.csproj" />
   </ItemGroup>
 
 </Project>

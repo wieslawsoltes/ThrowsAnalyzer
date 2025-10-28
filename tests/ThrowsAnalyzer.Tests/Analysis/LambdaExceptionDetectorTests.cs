@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
 using System.Threading.Tasks;
 using ThrowsAnalyzer.Analysis;
+using LambdaContext = RoslynAnalyzer.Core.Analysis.Patterns.Lambda.LambdaContext;
 
 namespace ThrowsAnalyzer.Tests.Analysis;
 

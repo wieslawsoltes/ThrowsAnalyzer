@@ -4,7 +4,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using RoslynAnalyzer.Core.Analysis.CallGraph;
 using ThrowsAnalyzer.Analysis;
+using LambdaContext = RoslynAnalyzer.Core.Analysis.Patterns.Lambda.LambdaContext;
 
 namespace ThrowsAnalyzer
 {

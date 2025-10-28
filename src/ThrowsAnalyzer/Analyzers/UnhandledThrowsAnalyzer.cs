@@ -3,7 +3,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using ThrowsAnalyzer.Core;
+using RoslynAnalyzer.Core.Members;
+using RoslynAnalyzer.Core.Configuration;
+using RoslynAnalyzer.Core.Helpers;
+using ThrowsAnalyzer.Analyzers;
 using ThrowsAnalyzer.Configuration;
 
 namespace ThrowsAnalyzer
@@ -30,14 +33,14 @@ public class UnhandledThrowsAnalyzer : DiagnosticAnalyzer
         var node = context.Node;
 
         // Check if this analyzer is enabled
-        if (!AnalyzerOptionsReader.IsAnalyzerEnabled(context.Options, context.Node.SyntaxTree, "unhandled_throw"))
+        if (!ThrowsAnalyzerOptions.IsAnalyzerEnabled(context.Options, context.Node.SyntaxTree, "unhandled_throw"))
         {
             return;
         }
 
         // Check if this member type is enabled in configuration
-        var memberTypeKey = AnalyzerOptionsReader.GetMemberTypeKey(node.Kind());
-        if (!AnalyzerOptionsReader.IsMemberTypeEnabled(context.Options, context.Node.SyntaxTree, memberTypeKey))
+        var memberTypeKey = ThrowsAnalyzerOptions.GetMemberTypeKey(node.Kind());
+        if (!ThrowsAnalyzerOptions.IsMemberTypeEnabled(context.Options, context.Node.SyntaxTree, memberTypeKey))
         {
             return;
         }
@@ -51,7 +54,7 @@ public class UnhandledThrowsAnalyzer : DiagnosticAnalyzer
         if (UnhandledThrowDetector.HasUnhandledThrows(node))
         {
             // Get appropriate location and name based on member type
-            var location = AnalyzerHelper.GetMemberLocation(node);
+            var location = DiagnosticHelpers.GetMemberLocation(node);
             var memberName = ExecutableMemberHelper.GetMemberDisplayName(node);
 
             var diagnostic = Diagnostic.Create(

@@ -4,6 +4,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ThrowsAnalyzer.TypeAnalysis;
+using LambdaContext = RoslynAnalyzer.Core.Analysis.Patterns.Lambda.LambdaContext;
 
 namespace ThrowsAnalyzer.Analysis
 {

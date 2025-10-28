@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using ThrowsAnalyzer.Analysis;
+using CoreAsyncDetector = RoslynAnalyzer.Core.Analysis.Patterns.Async.AsyncMethodDetector;
 
 namespace ThrowsAnalyzer.Analyzers
 {
@@ -55,11 +56,11 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Only analyze async methods
-            if (!AsyncMethodDetector.IsAsyncMethod(methodSymbol))
+            if (!CoreAsyncDetector.IsAsyncMethod(methodSymbol))
                 return;
 
             // Don't analyze async void (covered by THROWS021)
-            if (AsyncMethodDetector.IsAsyncVoid(methodSymbol, context.Compilation))
+            if (CoreAsyncDetector.IsAsyncVoid(methodSymbol, context.Compilation))
                 return;
 
             AnalyzeAsyncMethod(context, methodSymbol, methodDecl);
@@ -75,11 +76,11 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Only analyze async local functions
-            if (!AsyncMethodDetector.IsAsyncMethod(methodSymbol))
+            if (!CoreAsyncDetector.IsAsyncMethod(methodSymbol))
                 return;
 
             // Don't analyze async void
-            if (AsyncMethodDetector.IsAsyncVoid(methodSymbol, context.Compilation))
+            if (CoreAsyncDetector.IsAsyncVoid(methodSymbol, context.Compilation))
                 return;
 
             AnalyzeAsyncMethod(context, methodSymbol, localFunc);

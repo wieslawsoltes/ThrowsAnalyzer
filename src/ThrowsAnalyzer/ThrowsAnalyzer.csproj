@@ -91,8 +91,13 @@ v1.0.0 - Initial Release
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RoslynAnalyzer.Core\RoslynAnalyzer.Core.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Pack both analyzer and code fix provider -->
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\RoslynAnalyzer.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ThrowsAnalyzer.TypeAnalysis;
+using CoreAsyncDetector = RoslynAnalyzer.Core.Analysis.Patterns.Async.AsyncMethodDetector;
 
 namespace ThrowsAnalyzer.Analysis
 {
@@ -35,7 +36,7 @@ namespace ThrowsAnalyzer.Analysis
                 AsyncInfo = AsyncMethodDetector.GetAsyncMethodInfo(method, methodNode, _semanticModel)
             };
 
-            var body = AsyncMethodDetector.GetMethodBody(methodNode);
+            var body = CoreAsyncDetector.GetMethodBody(methodNode);
             if (body == null)
                 return info;
 
@@ -103,7 +104,7 @@ namespace ThrowsAnalyzer.Analysis
 
         private void AnalyzeUnawaitedTasks(AsyncExceptionInfo info, SyntaxNode body)
         {
-            var unawaitedInvocations = AsyncMethodDetector.GetUnawaitedTaskInvocations(body, _semanticModel);
+            var unawaitedInvocations = CoreAsyncDetector.GetUnawaitedTaskInvocations(body, _semanticModel);
 
             foreach (var invocation in unawaitedInvocations)
             {

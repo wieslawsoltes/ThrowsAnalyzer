@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using ThrowsAnalyzer.Analysis;
+using CoreAsyncDetector = RoslynAnalyzer.Core.Analysis.Patterns.Async.AsyncMethodDetector;
 
 namespace ThrowsAnalyzer.Analyzers
 {
@@ -59,7 +60,7 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Only analyze async void methods
-            if (!AsyncMethodDetector.IsAsyncVoid(methodSymbol, context.Compilation))
+            if (!CoreAsyncDetector.IsAsyncVoid(methodSymbol, context.Compilation))
                 return;
 
             // Exception: Allow async void for event handlers
@@ -79,7 +80,7 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Only analyze async void local functions
-            if (!AsyncMethodDetector.IsAsyncVoid(methodSymbol, context.Compilation))
+            if (!CoreAsyncDetector.IsAsyncVoid(methodSymbol, context.Compilation))
                 return;
 
             AnalyzeAsyncVoidMethod(context, methodSymbol, localFunc);
@@ -90,7 +91,7 @@ namespace ThrowsAnalyzer.Analyzers
             var lambda = (Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax)context.Node;
 
             // Check if this is an async lambda
-            if (!AsyncMethodDetector.HasAsyncModifier(lambda))
+            if (!CoreAsyncDetector.HasAsyncModifier(lambda))
                 return;
 
             // Get the lambda's type info to check return type
@@ -105,7 +106,7 @@ namespace ThrowsAnalyzer.Analyzers
                 return;
 
             // Analyze the lambda body for throws
-            var body = AsyncMethodDetector.GetMethodBody(lambda);
+            var body = CoreAsyncDetector.GetMethodBody(lambda);
             if (body == null)
                 return;
 
@@ -147,7 +148,7 @@ namespace ThrowsAnalyzer.Analyzers
             var info = Task.Run(async () => await analysisTask).GetAwaiter().GetResult();
 
             // Check for any throws (before or after await)
-            var body = AsyncMethodDetector.GetMethodBody(methodNode);
+            var body = CoreAsyncDetector.GetMethodBody(methodNode);
             if (body == null)
                 return;
 

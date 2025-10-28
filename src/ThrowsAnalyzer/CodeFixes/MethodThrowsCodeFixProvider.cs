@@ -8,7 +8,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using ThrowsAnalyzer.Core;
+using RoslynAnalyzer.Core.Members;
+using RoslynAnalyzer.Core.Helpers;
 using ThrowsAnalyzer.TypeAnalysis;
 
 namespace ThrowsAnalyzer.CodeFixes
