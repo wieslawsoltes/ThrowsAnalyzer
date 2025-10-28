@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>disposable-analyzer</AssemblyName>
+    <RootNamespace>DisposableAnalyzer.Cli</RootNamespace>
+
+    <!-- CLI Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>disposable-analyzer</ToolCommandName>
+    <PackageId>DisposableAnalyzer.Cli</PackageId>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
+    <Title>DisposableAnalyzer CLI - IDisposable Analysis Tool</Title>
+    <Description>Command-line tool for running DisposableAnalyzer on projects and solutions, generating comprehensive HTML and Markdown reports with resource management diagnostics, disposal patterns, statistics, and code snippets.</Description>
+    <PackageTags>roslyn;analyzer;cli;tool;disposable;idisposable;using;resource-management;diagnostic;reports;code-quality;static-analysis</PackageTags>
+    <Authors>Wiesław Šoltés</Authors>
+    <Copyright>Copyright © 2025 Wiesław Šoltés</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/wieslawsoltes/ThrowsAnalyzer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>CLI_README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="CLI_README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Roslyn Workspaces for loading solutions/projects -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.12.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+
+    <!-- CLI Framework -->
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+
+    <!-- DisposableAnalyzer -->
+    <ProjectReference Include="../DisposableAnalyzer/DisposableAnalyzer.csproj" />
+  </ItemGroup>
+
+</Project>

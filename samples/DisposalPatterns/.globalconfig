@@ -1,0 +1,4 @@
+is_global = true
+
+# Suppress analyzer release tracking for sample projects
+dotnet_diagnostic.RS2007.severity = none
