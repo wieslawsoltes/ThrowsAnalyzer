@@ -45,19 +45,19 @@ public class AddReturnDisposableCodeFixProvider : CodeFixProvider
         if (variableDeclarator == null)
             return;
 
-        // Offer two fixes: return the disposable or add disposal
-        context.RegisterCodeFix(
-            CodeAction.Create(
-                title: "Return disposable to caller",
-                createChangedDocument: c => ReturnDisposableAsync(context.Document, variableDeclarator, root, c),
-                equivalenceKey: "ReturnDisposable"),
-            diagnostic);
-
+        // Offer two fixes: add disposal or return the disposable
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: "Add disposal at end of method",
                 createChangedDocument: c => AddDisposalAsync(context.Document, variableDeclarator, root, c),
                 equivalenceKey: "AddDisposal"),
+            diagnostic);
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: "Return disposable to caller",
+                createChangedDocument: c => ReturnDisposableAsync(context.Document, variableDeclarator, root, c),
+                equivalenceKey: "ReturnDisposable"),
             diagnostic);
     }
 
@@ -135,8 +135,17 @@ public class AddReturnDisposableCodeFixProvider : CodeFixProvider
                     SyntaxFactory.MemberBindingExpression(
                         SyntaxFactory.IdentifierName("Dispose")))));
 
+        var body = methodDeclaration.Body;
+        var closeBrace = body.CloseBraceToken;
+
+        // Preserve trailing trivia (e.g., comments) by moving it to the new statement
+        var disposeLeadingTrivia = closeBrace.LeadingTrivia;
+        disposeStatement = disposeStatement.WithLeadingTrivia(disposeLeadingTrivia);
+
+        var updatedCloseBrace = closeBrace.WithLeadingTrivia(SyntaxFactory.TriviaList());
+
         // Add disposal at the end of the method
-        var newBody = methodDeclaration.Body.AddStatements(disposeStatement);
+        var newBody = body.WithCloseBraceToken(updatedCloseBrace).AddStatements(disposeStatement);
         var newMethod = methodDeclaration.WithBody(newBody)
             .WithAdditionalAnnotations(Formatter.Annotation);
 

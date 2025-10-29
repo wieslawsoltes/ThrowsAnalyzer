@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -38,66 +37,142 @@ public class DisposableInLambdaAnalyzer : DiagnosticAnalyzer
     {
         var lambda = (IAnonymousFunctionOperation)context.Operation;
 
-        // Track disposable locals created in the lambda
-        var disposableLocals = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+        if (LambdaEscapes(lambda))
+            return;
+
+        var trackedLocals = new Dictionary<ILocalSymbol, DisposableCreation>(SymbolEqualityComparer.Default);
         var disposedLocals = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+        var directCreations = new List<DisposableCreation>();
 
-        // Analyze the lambda body
-        AnalyzeOperation(lambda.Body, disposableLocals, disposedLocals);
+        AnalyzeOperation(lambda.Body, trackedLocals, disposedLocals, directCreations);
 
-        // Report undisposed locals
-        foreach (var local in disposableLocals)
+        foreach (var kvp in trackedLocals)
         {
-            if (!disposedLocals.Contains(local))
+            if (!disposedLocals.Contains(kvp.Key))
             {
-                var diagnostic = Diagnostic.Create(
-                    Rule,
-                    lambda.Syntax.GetLocation(),
-                    local.Name);
-                context.ReportDiagnostic(diagnostic);
+                ReportDiagnostic(context, kvp.Value);
             }
+        }
+
+        foreach (var creation in directCreations)
+        {
+            ReportDiagnostic(context, creation);
         }
     }
 
     private void AnalyzeOperation(
         IOperation operation,
-        HashSet<ILocalSymbol> disposableLocals,
-        HashSet<ILocalSymbol> disposedLocals)
+        Dictionary<ILocalSymbol, DisposableCreation> trackedLocals,
+        HashSet<ILocalSymbol> disposedLocals,
+        List<DisposableCreation> directCreations)
     {
-        if (operation is IVariableDeclaratorOperation declarator)
+        switch (operation)
         {
-            var local = declarator.Symbol;
-            if (declarator.Initializer?.Value != null)
-            {
-                var initType = declarator.Initializer.Value.Type;
-                if (DisposableHelper.IsAnyDisposableType(initType))
-                {
-                    disposableLocals.Add(local);
-                }
-            }
-        }
-
-        if (operation is IInvocationOperation invocation)
-        {
-            if (invocation.Instance is ILocalReferenceOperation localRef)
-            {
-                if (DisposableHelper.IsDisposalCall(invocation, out _))
-                {
-                    disposedLocals.Add(localRef.Local);
-                }
-            }
-        }
-
-        if (operation is IUsingOperation)
-        {
-            // Variables in using are automatically disposed
-            MarkUsingLocalsAsDisposed(operation, disposedLocals);
+            case IVariableDeclaratorOperation declarator:
+                HandleVariableDeclarator(declarator, trackedLocals);
+                break;
+            case IInvocationOperation invocation:
+                HandleInvocation(invocation, disposedLocals);
+                break;
+            case IConditionalAccessOperation conditional:
+                HandleConditionalAccess(conditional, disposedLocals);
+                break;
+            case IUsingOperation usingOperation:
+                MarkUsingLocalsAsDisposed(usingOperation, disposedLocals);
+                break;
+            case IObjectCreationOperation creation:
+                HandleDirectCreation(creation, directCreations);
+                break;
         }
 
         foreach (var child in operation.Children)
         {
-            AnalyzeOperation(child, disposableLocals, disposedLocals);
+            AnalyzeOperation(child, trackedLocals, disposedLocals, directCreations);
         }
+    }
+
+    private void HandleVariableDeclarator(
+        IVariableDeclaratorOperation declarator,
+        Dictionary<ILocalSymbol, DisposableCreation> trackedLocals)
+    {
+        if (declarator.Initializer?.Value is not IObjectCreationOperation creation)
+            return;
+
+        if (!DisposableHelper.IsAnyDisposableType(creation.Type))
+            return;
+
+        if (DisposableHelper.IsInUsingStatement(declarator.Syntax))
+            return;
+
+        var typeName = creation.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var location = creation.Syntax.GetLocation();
+        trackedLocals[declarator.Symbol] = new DisposableCreation(location, typeName);
+    }
+
+    private void HandleInvocation(
+        IInvocationOperation invocation,
+        HashSet<ILocalSymbol> disposedLocals)
+    {
+        if (invocation.Instance is ILocalReferenceOperation localRef &&
+            DisposableHelper.IsDisposalCall(invocation, out _))
+        {
+            disposedLocals.Add(localRef.Local);
+        }
+    }
+
+    private void HandleConditionalAccess(
+        IConditionalAccessOperation conditional,
+        HashSet<ILocalSymbol> disposedLocals)
+    {
+        if (conditional.Operation is ILocalReferenceOperation localRef &&
+            conditional.WhenNotNull is IInvocationOperation invocation &&
+            DisposableHelper.IsDisposalCall(invocation, out _))
+        {
+            disposedLocals.Add(localRef.Local);
+        }
+    }
+
+    private void HandleDirectCreation(
+        IObjectCreationOperation creation,
+        List<DisposableCreation> directCreations)
+    {
+        if (!DisposableHelper.IsAnyDisposableType(creation.Type))
+            return;
+
+        if (DisposableHelper.IsInUsingStatement(creation.Syntax))
+            return;
+
+        var parent = SkipImplicitOperations(creation.Parent);
+
+        if (parent is IVariableInitializerOperation or IArgumentOperation)
+            return;
+
+        if (parent is IAssignmentOperation assignment &&
+            assignment.Target is ILocalReferenceOperation)
+        {
+            return;
+        }
+
+        var typeName = creation.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var location = creation.Syntax.GetLocation();
+        directCreations.Add(new DisposableCreation(location, typeName));
+    }
+
+    private static IOperation? SkipImplicitOperations(IOperation? operation)
+    {
+        while (operation is IConversionOperation { IsImplicit: true } ||
+               operation is IDelegateCreationOperation { IsImplicit: true })
+        {
+            operation = operation?.Parent;
+        }
+
+        return operation;
+    }
+
+    private bool LambdaEscapes(IAnonymousFunctionOperation lambda)
+    {
+        var parent = SkipImplicitOperations(lambda.Parent);
+        return parent is IReturnOperation;
     }
 
     private void MarkUsingLocalsAsDisposed(IOperation usingOp, HashSet<ILocalSymbol> disposedLocals)
@@ -109,5 +184,26 @@ public class DisposableInLambdaAnalyzer : DiagnosticAnalyzer
                 disposedLocals.Add(localRef.Local);
             }
         }
+    }
+
+    private void ReportDiagnostic(OperationAnalysisContext context, DisposableCreation creation)
+    {
+        var diagnostic = Diagnostic.Create(
+            Rule,
+            creation.Location,
+            creation.TypeName);
+        context.ReportDiagnostic(diagnostic);
+    }
+
+    private readonly struct DisposableCreation
+    {
+        public DisposableCreation(Location location, string typeName)
+        {
+            Location = location;
+            TypeName = typeName;
+        }
+
+        public Location Location { get; }
+        public string TypeName { get; }
     }
 }

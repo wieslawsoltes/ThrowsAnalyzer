@@ -46,6 +46,7 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             return;
 
         var disposableCreations = new List<(ILocalSymbol local, Location location)>();
+        var localsNeedingFinally = new HashSet<string>();
 
         // Track disposable creations
         context.RegisterOperationAction(operationContext =>
@@ -63,6 +64,25 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             }
         }, OperationKind.ObjectCreation);
 
+        context.RegisterOperationAction(operationContext =>
+        {
+            var tryOperation = (ITryOperation)operationContext.Operation;
+            var referencedLocals = tryOperation.Descendants()
+                .OfType<ILocalReferenceOperation>()
+                .Select(localRef => localRef.Local)
+                .Where(local => DisposableHelper.IsAnyDisposableType(local.Type))
+                .Distinct(SymbolEqualityComparer.Default);
+
+            foreach (var local in referencedLocals)
+            {
+                if (tryOperation.Finally == null ||
+                    !FinallyDisposesLocal(tryOperation.Finally, local))
+                {
+                    localsNeedingFinally.Add(local.Name);
+                }
+            }
+        }, OperationKind.Try);
+
         context.RegisterOperationBlockEndAction(blockEndContext =>
         {
             var methodOperation = blockEndContext.OperationBlocks.FirstOrDefault();
@@ -78,7 +98,7 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
                     blockEndContext.Compilation.GetSemanticModel(methodOperation.Syntax.SyntaxTree)
                 );
 
-                if (!analysis.IsDisposedOnAllPaths)
+                if (!analysis.IsDisposedOnAllPaths || localsNeedingFinally.Contains(local.Name))
                 {
                     var diagnostic = Diagnostic.Create(
                         Rule,
@@ -109,5 +129,29 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             parent = parent.Parent;
         }
         return null;
+    }
+
+    private static bool FinallyDisposesLocal(IBlockOperation finallyBlock, ILocalSymbol local)
+    {
+        foreach (var operation in finallyBlock.Descendants())
+        {
+            switch (operation)
+            {
+                case IInvocationOperation invocation
+                    when invocation.Instance is ILocalReferenceOperation localRef &&
+                         SymbolEqualityComparer.Default.Equals(localRef.Local, local) &&
+                         DisposableHelper.IsDisposalCall(invocation, out _):
+                    return true;
+
+                case IConditionalAccessOperation conditional
+                    when conditional.Operation is ILocalReferenceOperation conditionalLocal &&
+                         SymbolEqualityComparer.Default.Equals(conditionalLocal.Local, local) &&
+                         conditional.WhenNotNull is IInvocationOperation innerInvocation &&
+                         DisposableHelper.IsDisposalCall(innerInvocation, out _):
+                    return true;
+            }
+        }
+
+        return false;
     }
 }

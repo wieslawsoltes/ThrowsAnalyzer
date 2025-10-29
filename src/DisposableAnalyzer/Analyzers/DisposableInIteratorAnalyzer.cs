@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -43,30 +42,33 @@ public class DisposableInIteratorAnalyzer : DiagnosticAnalyzer
         if (!IsIteratorMethod(method))
             return;
 
-        var disposableUsages = new List<IOperation>();
+        var disposableUsages = new List<ResourceUsage>();
 
         context.RegisterOperationAction(operationContext =>
         {
             if (operationContext.Operation is IVariableDeclaratorOperation declarator)
             {
-                if (declarator.Initializer?.Value != null)
-                {
-                    var type = declarator.Initializer.Value.Type;
-                    if (DisposableHelper.IsAnyDisposableType(type))
-                    {
-                        disposableUsages.Add(declarator);
-                    }
-                }
+                if (declarator.Initializer?.Value == null)
+                    return;
+
+                // Skip resources that are already in a using statement/declaration
+                if (DisposableHelper.IsInUsingStatement(declarator.Syntax))
+                    return;
+
+                var resourceType = declarator.Symbol?.Type;
+                if (resourceType == null || !DisposableHelper.IsAnyDisposableType(resourceType))
+                    return;
+
+                var location = declarator.Initializer.Value.Syntax?.GetLocation() ?? declarator.Syntax.GetLocation();
+                var resourceDisplayName = resourceType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                disposableUsages.Add(new ResourceUsage(location, resourceDisplayName));
             }
 
             // Also check for using statements (which are problematic in iterators)
             if (operationContext.Operation is IUsingOperation usingOp)
             {
-                if (usingOp.Resources?.Type != null &&
-                    DisposableHelper.IsAnyDisposableType(usingOp.Resources.Type))
-                {
-                    disposableUsages.Add(usingOp);
-                }
+                // Using/await using ensures deterministic disposal even in iterators
+                return;
             }
         }, OperationKind.VariableDeclarator, OperationKind.Using);
 
@@ -74,11 +76,10 @@ public class DisposableInIteratorAnalyzer : DiagnosticAnalyzer
         {
             foreach (var usage in disposableUsages)
             {
-                string resourceName = GetResourceName(usage);
                 var diagnostic = Diagnostic.Create(
                     Rule,
-                    usage.Syntax.GetLocation(),
-                    resourceName);
+                    usage.Location,
+                    usage.DisplayName);
                 blockEndContext.ReportDiagnostic(diagnostic);
             }
         });
@@ -94,28 +95,23 @@ public class DisposableInIteratorAnalyzer : DiagnosticAnalyzer
             return typeName == "System.Collections.Generic.IEnumerable<T>" ||
                    typeName == "System.Collections.Generic.IEnumerator<T>" ||
                    typeName == "System.Collections.IEnumerable" ||
-                   typeName == "System.Collections.IEnumerator";
+                   typeName == "System.Collections.IEnumerator" ||
+                   typeName == "System.Collections.Generic.IAsyncEnumerable<T>" ||
+                   typeName == "System.Collections.Generic.IAsyncEnumerator<T>";
         }
 
         return false;
     }
 
-    private string GetResourceName(IOperation operation)
+    private readonly struct ResourceUsage
     {
-        if (operation is IVariableDeclaratorOperation declarator)
+        public ResourceUsage(Location location, string displayName)
         {
-            return declarator.Symbol.Name;
+            Location = location;
+            DisplayName = displayName;
         }
 
-        if (operation is IUsingOperation usingOp)
-        {
-            if (usingOp.Resources is IVariableDeclarationGroupOperation varGroup)
-            {
-                var firstVar = varGroup.Declarations.FirstOrDefault()?.Declarators.FirstOrDefault();
-                return firstVar?.Symbol.Name ?? "resource";
-            }
-        }
-
-        return "resource";
+        public Location Location { get; }
+        public string DisplayName { get; }
     }
 }
