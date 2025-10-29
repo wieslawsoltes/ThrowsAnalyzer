@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -58,27 +59,98 @@ public class DocumentDisposalOwnershipCodeFixProvider : CodeFixProvider
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         if (root == null) return document;
 
-        // Create XML documentation comment
-        var docComment = SyntaxFactory.DocumentationCommentTrivia(
-            SyntaxKind.SingleLineDocumentationCommentTrivia,
-            SyntaxFactory.List(new XmlNodeSyntax[]
-            {
-                SyntaxFactory.XmlText("/// "),
-                SyntaxFactory.XmlElement(
-                    SyntaxFactory.XmlElementStartTag(SyntaxFactory.XmlName("returns")),
-                    SyntaxFactory.XmlElementEndTag(SyntaxFactory.XmlName("returns")))
-                    .WithContent(SyntaxFactory.SingletonList<XmlNodeSyntax>(
-                        SyntaxFactory.XmlText(
-                            "A disposable resource. The caller is responsible for disposing the returned object."))),
-                SyntaxFactory.XmlText("\n")
-            }));
-
         var leadingTrivia = methodDeclaration.GetLeadingTrivia();
-        var newLeadingTrivia = leadingTrivia.Insert(0, SyntaxFactory.Trivia(docComment));
+        var documentationTrivia = leadingTrivia
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DocumentationCommentTriviaSyntax>()
+            .FirstOrDefault();
 
-        var newMethodDeclaration = methodDeclaration.WithLeadingTrivia(newLeadingTrivia);
-        var newRoot = root.ReplaceNode(methodDeclaration, newMethodDeclaration);
+        var indent = GetIndentation(methodDeclaration);
+        var returnTypeName = methodDeclaration.ReturnType.ToString();
 
-        return document.WithSyntaxRoot(newRoot);
+        if (documentationTrivia == null)
+        {
+            var docCommentText = BuildCommentText(indent, returnTypeName);
+            var leadingWithDoc = BuildLeadingTrivia(methodDeclaration, docCommentText);
+            var newMethodDeclaration = methodDeclaration.WithLeadingTrivia(leadingWithDoc);
+            var newRoot = root.ReplaceNode(methodDeclaration, newMethodDeclaration);
+            return document.WithSyntaxRoot(newRoot);
+        }
+
+        var docTextLines = documentationTrivia.ToFullString()
+            .Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None)
+            .ToList();
+
+        if (!docTextLines.Any(line => line.Contains("<returns")))
+        {
+            docTextLines.Add($"{indent}/// <returns>A {returnTypeName} that the caller must dispose.</returns>");
+        }
+
+        if (!docTextLines.Any(line => line.Contains("<remarks")))
+        {
+            docTextLines.Add($"{indent}/// <remarks>");
+            docTextLines.Add($"{indent}/// The caller is responsible for disposing the returned resource.");
+            docTextLines.Add($"{indent}/// </remarks>");
+        }
+
+        if (!docTextLines.Any(line => line.Contains("<summary")))
+        {
+            docTextLines.Insert(0, $"{indent}/// <summary>");
+            docTextLines.Insert(1, $"{indent}/// Creates a {returnTypeName}.");
+            docTextLines.Insert(2, $"{indent}/// </summary>");
+        }
+
+        var updatedDocComment = string.Join("\n", docTextLines) + "\n";
+        var updatedLeadingTrivia = BuildLeadingTrivia(methodDeclaration, updatedDocComment);
+
+        var updatedMethod = methodDeclaration.WithLeadingTrivia(updatedLeadingTrivia);
+        var replacedRoot = root.ReplaceNode(methodDeclaration, updatedMethod);
+        return document.WithSyntaxRoot(replacedRoot);
+    }
+
+    private static SyntaxTriviaList BuildLeadingTrivia(MethodDeclarationSyntax methodDeclaration, string docCommentText)
+    {
+        var leadingTrivia = methodDeclaration.GetLeadingTrivia();
+
+        var baseTrivia = leadingTrivia.Where(t => t.GetStructure() is not DocumentationCommentTriviaSyntax).ToList();
+        if (baseTrivia.Count > 0)
+        {
+            var last = baseTrivia[baseTrivia.Count - 1];
+            if (last.IsKind(SyntaxKind.WhitespaceTrivia))
+            {
+                baseTrivia.RemoveAt(baseTrivia.Count - 1);
+            }
+        }
+
+        var indentTrivia = SyntaxFactory.Whitespace(GetIndentation(methodDeclaration));
+        var docTrivia = SyntaxFactory.ParseLeadingTrivia(docCommentText);
+
+        return SyntaxFactory.TriviaList(baseTrivia).AddRange(docTrivia).Add(indentTrivia);
+    }
+
+    private static string BuildCommentText(string indent, string returnTypeName)
+    {
+        return $"{indent}/// <summary>\n" +
+               $"{indent}/// Creates a {returnTypeName}.\n" +
+               $"{indent}/// </summary>\n" +
+               $"{indent}/// <returns>A {returnTypeName} that the caller must dispose.</returns>\n" +
+               $"{indent}/// <remarks>\n" +
+               $"{indent}/// The caller is responsible for disposing the returned resource.\n" +
+               $"{indent}/// </remarks>\n";
+    }
+
+    private static string GetIndentation(MethodDeclarationSyntax methodDeclaration)
+    {
+        var token = methodDeclaration.GetFirstToken();
+        var lineSpan = token.GetLocation().GetLineSpan();
+        var column = Math.Max(0, lineSpan.StartLinePosition.Character);
+        if (column == 0)
+        {
+            var whitespaceTrivia = methodDeclaration.GetLeadingTrivia()
+                .LastOrDefault(t => t.IsKind(SyntaxKind.WhitespaceTrivia));
+            if (whitespaceTrivia != default)
+                return whitespaceTrivia.ToString();
+        }
+        return column > 0 ? new string(' ', column) : string.Empty;
     }
 }

@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
+using System.Threading;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using DisposableAnalyzer.Helpers;
 
@@ -79,16 +81,60 @@ public class DisposeBoolPatternAnalyzer : DiagnosticAnalyzer
         }
 
         // If type has finalizer, check that Dispose() calls GC.SuppressFinalize
-        if (hasFinalizer)
+        if (hasFinalizer && disposeBoolMethod != null)
         {
             var disposeMethod = DisposableHelper.GetDisposeMethod(namedType);
             if (disposeMethod != null &&
                 SymbolEqualityComparer.Default.Equals(disposeMethod.ContainingType, namedType))
             {
-                // This would require operation analysis to verify the call
-                // For now, we just flag it for manual review
-                // Full implementation would check method body for SuppressFinalize call
+                if (!CallsSuppressFinalize(disposeMethod, context.CancellationToken))
+                {
+                    var location = namedType.Locations.FirstOrDefault() ?? disposeMethod.Locations.FirstOrDefault();
+                    var diagnostic = Diagnostic.Create(
+                        MissingSuppressFinalize,
+                        location,
+                        namedType.Name);
+                    context.ReportDiagnostic(diagnostic);
+                }
             }
         }
+    }
+
+    private static bool CallsSuppressFinalize(IMethodSymbol disposeMethod, CancellationToken cancellationToken)
+    {
+        foreach (var syntaxRef in disposeMethod.DeclaringSyntaxReferences)
+        {
+            if (syntaxRef.GetSyntax(cancellationToken) is not MethodDeclarationSyntax methodSyntax)
+                continue;
+
+            // Block body
+            if (methodSyntax.Body != null && ContainsSuppressFinalizeInvocation(methodSyntax.Body))
+                return true;
+
+            // Expression-bodied members
+            if (methodSyntax.ExpressionBody != null &&
+                ContainsSuppressFinalizeInvocation(methodSyntax.ExpressionBody.Expression))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsSuppressFinalizeInvocation(SyntaxNode node)
+    {
+        foreach (var invocation in node.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                memberAccess.Expression is IdentifierNameSyntax identifier &&
+                identifier.Identifier.Text == "GC" &&
+                memberAccess.Name.Identifier.Text == "SuppressFinalize")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

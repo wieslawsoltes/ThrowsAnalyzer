@@ -1,16 +1,20 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using DisposableAnalyzer.Helpers;
-using RoslynAnalyzer.Core.Analysis.CallGraph;
 
 namespace DisposableAnalyzer.Analyzers;
 
 /// <summary>
-/// Analyzer that detects when disposable resources are created but not returned or disposed across method boundaries.
-/// DISP021: Disposal not propagated
+/// Analyzer that detects when disposal responsibility is not clearly propagated
+/// either because fields are left undisposed or locals receiving disposables are
+/// neither disposed nor returned.
+/// DISP021: Disposal not propagated.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class DisposalNotPropagatedAnalyzer : DiagnosticAnalyzer
@@ -18,124 +22,229 @@ public class DisposalNotPropagatedAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.DisposalNotPropagated,
         title: "Disposal responsibility not propagated",
-        messageFormat: "Disposable '{0}' created in '{1}' is not disposed and not returned. Consider disposing or returning it",
+        messageFormat: "Type '{0}' does not dispose field '{1}'",
         category: "Resource Management",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "When a method creates a disposable resource but doesn't dispose it, the resource must be returned to transfer ownership to the caller.");
+        description: "Disposables stored in fields or produced by helper methods must be disposed locally or their ownership must be transferred back to the caller.");
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        ImmutableArray.Create(Rule);
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
 
-        context.RegisterCompilationStartAction(compilationContext =>
+        context.RegisterSymbolAction(AnalyzeNamedType, SymbolKind.NamedType);
+        context.RegisterOperationBlockStartAction(AnalyzeMethod);
+    }
+
+    private static void AnalyzeNamedType(SymbolAnalysisContext context)
+    {
+        if (context.Symbol is not INamedTypeSymbol typeSymbol)
+            return;
+
+        if (typeSymbol.TypeKind != TypeKind.Class && typeSymbol.TypeKind != TypeKind.Struct)
+            return;
+
+        var disposableFields = typeSymbol.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(f => !f.IsStatic && DisposableHelper.IsAnyDisposableType(f.Type))
+            .ToList();
+
+        if (disposableFields.Count == 0)
+            return;
+
+        var disposeLikeMethods = typeSymbol.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(IsDisposeLike)
+            .ToList();
+
+        foreach (var field in disposableFields)
         {
-            compilationContext.RegisterCompilationEndAction(async compilationEndContext =>
+            if (disposeLikeMethods.Any(method => MethodDisposesField(method, field, context.CancellationToken)))
+                continue;
+
+            var location = typeSymbol.Locations.FirstOrDefault() ?? field.Locations.FirstOrDefault();
+            var fieldReference = field.DeclaringSyntaxReferences.FirstOrDefault();
+            var fieldLocation = fieldReference != null
+                ? Location.Create(fieldReference.SyntaxTree, fieldReference.Span)
+                : field.Locations.FirstOrDefault() ?? location;
+            context.ReportDiagnostic(Diagnostic.Create(Rule, fieldLocation, field.Name, typeSymbol.Name));
+        }
+    }
+
+    private static void AnalyzeMethod(OperationBlockStartAnalysisContext context)
+    {
+        if (context.OwningSymbol is not IMethodSymbol method ||
+            method.MethodKind is not MethodKind.Ordinary && method.MethodKind is not MethodKind.PropertySet)
+        {
+            return;
+        }
+
+        var locals = new Dictionary<ILocalSymbol, LocalUsage>(SymbolEqualityComparer.Default);
+
+        context.RegisterOperationAction(operationContext =>
+        {
+            if (operationContext.Operation is not IVariableDeclaratorOperation declarator)
+                return;
+
+            var local = declarator.Symbol;
+            if (!DisposableHelper.IsAnyDisposableType(local.Type))
+                return;
+
+            if (DisposableHelper.IsInUsingStatement(declarator.Syntax))
+                return;
+
+            string? source = null;
+            var value = declarator.Initializer?.Value;
+
+            switch (value)
             {
-                var builder = new CallGraphBuilder(compilationEndContext.Compilation, compilationEndContext.CancellationToken);
-                var callGraph = await builder.BuildAsync().ConfigureAwait(false);
-                AnalyzeCallGraph(compilationEndContext, callGraph);
-            });
+                case IObjectCreationOperation:
+                    source = local.Type.Name;
+                    break;
+                case IInvocationOperation invocation when DisposableHelper.IsAnyDisposableType(invocation.Type):
+                    source = invocation.TargetMethod.Name;
+                    break;
+            }
+
+            if (source == null)
+                return;
+
+            locals[local] = new LocalUsage(
+                declarator.Syntax.GetLocation(),
+                source);
+        }, OperationKind.VariableDeclarator);
+
+        context.RegisterOperationAction(operationContext =>
+        {
+            if (!DisposableHelper.IsDisposalCall(operationContext.Operation, out _))
+                return;
+
+            var targetLocal = GetLocalFromInvocation(operationContext.Operation);
+            if (targetLocal != null && locals.TryGetValue(targetLocal, out var usage))
+            {
+                usage.IsDisposed = true;
+            }
+        }, OperationKind.Invocation, OperationKind.ConditionalAccess);
+
+        context.RegisterOperationAction(operationContext =>
+        {
+            if (operationContext.Operation is IReturnOperation returnOp &&
+                returnOp.ReturnedValue is ILocalReferenceOperation localRef &&
+                locals.TryGetValue(localRef.Local, out var usage))
+            {
+                usage.IsReturned = true;
+            }
+        }, OperationKind.Return);
+
+        context.RegisterOperationBlockEndAction(blockEndContext =>
+        {
+            foreach (var kvp in locals)
+            {
+                var local = kvp.Key;
+                var usage = kvp.Value;
+
+                if (usage.IsDisposed || usage.IsReturned)
+                    continue;
+
+                blockEndContext.ReportDiagnostic(
+                    Diagnostic.Create(Rule, usage.Location, local.Name, usage.Source));
+            }
         });
     }
 
-    private void AnalyzeCallGraph(CompilationAnalysisContext context, CallGraph callGraph)
+    private static bool IsDisposeLike(IMethodSymbol method)
     {
-        foreach (var node in callGraph.Nodes)
+        if (method is null)
+            return false;
+
+        if (method.Name == "Dispose" && method.Parameters.Length == 0)
+            return true;
+
+        if (DisposableHelper.IsDisposeBoolMethod(method))
+            return true;
+
+        if (method.Name == "DisposeAsync" && method.Parameters.Length == 0)
+            return true;
+
+        return false;
+    }
+
+    private static bool MethodDisposesField(IMethodSymbol method, IFieldSymbol field, CancellationToken cancellationToken)
+    {
+        foreach (var syntaxRef in method.DeclaringSyntaxReferences)
         {
-            var method = node.Method;
-
-            // Skip if method has no body (extern, abstract, interface)
-            if (method.DeclaringSyntaxReferences.Length == 0)
+            if (syntaxRef.GetSyntax(cancellationToken) is not MethodDeclarationSyntax methodSyntax)
                 continue;
 
-            var syntaxRef = method.DeclaringSyntaxReferences[0];
-            var syntax = syntaxRef.GetSyntax(context.CancellationToken);
-            var semanticModel = context.Compilation.GetSemanticModel(syntax.SyntaxTree);
+            // Check standard block body
+            if (methodSyntax.Body != null && DisposesField(methodSyntax.Body, field.Name))
+                return true;
 
-            if (semanticModel == null)
-                continue;
-
-            var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
-            if (operation == null)
-                continue;
-
-            // Track disposables created in this method
-            var createdDisposables = new System.Collections.Generic.List<(string name, ITypeSymbol type, Location location)>();
-            var disposedSymbols = new System.Collections.Generic.HashSet<ISymbol>(SymbolEqualityComparer.Default);
-            var returnedSymbols = new System.Collections.Generic.HashSet<ISymbol>(SymbolEqualityComparer.Default);
-
-            // Find all disposable creations
-            foreach (var descendant in operation.Descendants())
+            // Check expression-bodied members
+            if (methodSyntax.ExpressionBody != null &&
+                DisposesField(methodSyntax.ExpressionBody.Expression, field.Name))
             {
-                if (descendant is IObjectCreationOperation creation)
-                {
-                    if (DisposableHelper.IsAnyDisposableType(creation.Type))
-                    {
-                        // Check if assigned to local or parameter
-                        if (creation.Parent is IAssignmentOperation assignment &&
-                            assignment.Target is ILocalReferenceOperation localRef)
-                        {
-                            createdDisposables.Add((localRef.Local.Name, creation.Type, creation.Syntax.GetLocation()));
-                        }
-                        else if (creation.Parent is IVariableInitializerOperation initializer &&
-                                 initializer.Parent is IVariableDeclaratorOperation declarator)
-                        {
-                            createdDisposables.Add((declarator.Symbol.Name, creation.Type, creation.Syntax.GetLocation()));
-                        }
-                    }
-                }
+                return true;
+            }
+        }
 
-                // Track disposals
-                if (descendant is IInvocationOperation invocation)
-                {
-                    if (DisposableHelper.IsDisposalCall(invocation, out _))
-                    {
-                        if (invocation.Instance is ILocalReferenceOperation localRef2)
-                        {
-                            disposedSymbols.Add(localRef2.Local);
-                        }
-                    }
-                }
+        return false;
+    }
 
-                // Track returns
-                if (descendant is IReturnOperation returnOp)
+    private static bool DisposesField(SyntaxNode node, string fieldName)
+    {
+        foreach (var invocation in node.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+            {
+                if (memberAccess.Expression is IdentifierNameSyntax identifier &&
+                    identifier.Identifier.Text == fieldName &&
+                    memberAccess.Name.Identifier.Text == "Dispose")
                 {
-                    if (returnOp.ReturnedValue is ILocalReferenceOperation localRef3)
-                    {
-                        returnedSymbols.Add(localRef3.Local);
-                    }
+                    return true;
                 }
             }
-
-            // Check each created disposable
-            foreach (var (name, type, location) in createdDisposables)
+            else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding &&
+                     memberBinding.Name.Identifier.Text == "Dispose")
             {
-                // Find the symbol for this local
-                var localSymbol = semanticModel.LookupSymbols(location.SourceSpan.Start, name: name)
-                    .FirstOrDefault();
-
-                if (localSymbol == null)
-                    continue;
-
-                // Check if it was disposed or returned
-                var wasDisposed = disposedSymbols.Contains(localSymbol);
-                var wasReturned = returnedSymbols.Contains(localSymbol);
-
-                if (!wasDisposed && !wasReturned)
+                if (invocation.Parent is ConditionalAccessExpressionSyntax conditional &&
+                    conditional.Expression is IdentifierNameSyntax conditionalIdentifier &&
+                    conditionalIdentifier.Identifier.Text == fieldName)
                 {
-                    // Not disposed and not returned - report diagnostic
-                    var diagnostic = Diagnostic.Create(
-                        Rule,
-                        location,
-                        type.Name,
-                        method.Name);
-                    context.ReportDiagnostic(diagnostic);
+                    return true;
                 }
             }
         }
+
+        return false;
+    }
+
+    private static ILocalSymbol? GetLocalFromInvocation(IOperation operation)
+    {
+        return operation switch
+        {
+            IInvocationOperation invocation when invocation.Instance is ILocalReferenceOperation localRef => localRef.Local,
+            IConditionalAccessOperation conditional when conditional.Operation is ILocalReferenceOperation localRef &&
+                                                         conditional.WhenNotNull is IInvocationOperation => localRef.Local,
+            _ => null
+        };
+    }
+
+    private sealed class LocalUsage
+    {
+        public LocalUsage(Location location, string source)
+        {
+            Location = location;
+            Source = source;
+        }
+
+        public Location Location { get; }
+        public string Source { get; }
+        public bool IsDisposed { get; set; }
+        public bool IsReturned { get; set; }
     }
 }

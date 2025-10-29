@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -77,45 +78,159 @@ public class MoveDisposalToFinallyCodeFixProvider : CodeFixProvider
         if (declarationStatement == null)
             return document;
 
-        // Get all statements after the variable declaration
         var methodBody = methodDeclaration.Body;
         var declarationIndex = methodBody.Statements.IndexOf(declarationStatement);
-
         if (declarationIndex < 0)
             return document;
 
-        // Statements to wrap in try block (everything after declaration)
-        var tryStatements = methodBody.Statements.Skip(declarationIndex + 1).ToArray();
-
-        // Create disposal statement: variableName?.Dispose();
         var variableName = variableDeclarator.Identifier.Text;
-        var disposeStatement = SyntaxFactory.ExpressionStatement(
+        var disposeStatement = CreateDisposeStatement(variableName);
+
+        var tryStatement = methodBody.Statements
+            .Skip(declarationIndex + 1)
+            .OfType<TryStatementSyntax>()
+            .FirstOrDefault();
+
+        // If no try exists, wrap subsequent statements in try/finally
+        if (tryStatement == null)
+        {
+            var trailingStatements = methodBody.Statements.Skip(declarationIndex + 1).ToList();
+            if (!trailingStatements.Any())
+                return document;
+
+            var newTry = SyntaxFactory.TryStatement()
+                .WithBlock(SyntaxFactory.Block(trailingStatements))
+                .WithFinally(SyntaxFactory.FinallyClause(SyntaxFactory.Block(disposeStatement)))
+                .WithAdditionalAnnotations(Formatter.Annotation);
+
+            var wrappedStatements = methodBody.Statements
+                .Take(declarationIndex + 1)
+                .Concat(new[] { newTry })
+                .ToArray();
+
+            var updatedBody = SyntaxFactory.Block(wrappedStatements);
+            var updatedMethod = methodDeclaration.WithBody(updatedBody);
+            var updatedRoot = root.ReplaceNode(methodDeclaration, updatedMethod);
+            return document.WithSyntaxRoot(updatedRoot);
+        }
+
+        var statements = methodBody.Statements;
+        var tryIndex = -1;
+        for (var i = 0; i < statements.Count; i++)
+        {
+            if (statements[i].Span == tryStatement.Span)
+            {
+                tryIndex = i;
+                break;
+            }
+        }
+
+        if (tryIndex < 0)
+            return document;
+
+        var cleanedTry = CleanCatchClauses(tryStatement, variableName);
+
+        var tryWithFinally = cleanedTry.Finally == null
+            ? cleanedTry.WithFinally(
+                SyntaxFactory.FinallyClause(
+                    SyntaxFactory.Block(disposeStatement)))
+            : cleanedTry.WithFinally(
+                cleanedTry.Finally!.WithBlock(cleanedTry.Finally.Block.AddStatements(disposeStatement)));
+
+        var updatedStatements = new List<StatementSyntax>(statements.Count);
+        for (var i = 0; i < statements.Count; i++)
+        {
+            if (i == tryIndex)
+            {
+                updatedStatements.Add(tryWithFinally.WithAdditionalAnnotations(Formatter.Annotation));
+                continue;
+            }
+
+            var statement = statements[i];
+            if (i > tryIndex && IsDisposeStatement(statement, variableName))
+                continue;
+
+            updatedStatements.Add(statement);
+        }
+
+        var newBody = methodBody.WithStatements(SyntaxFactory.List(updatedStatements));
+        var newMethod = methodDeclaration.WithBody(newBody)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+
+        var newRoot = root.ReplaceNode(methodDeclaration, newMethod);
+        return document.WithSyntaxRoot(newRoot);
+    }
+
+    private static ExpressionStatementSyntax CreateDisposeStatement(string variableName)
+    {
+        return SyntaxFactory.ExpressionStatement(
             SyntaxFactory.ConditionalAccessExpression(
                 SyntaxFactory.IdentifierName(variableName),
                 SyntaxFactory.InvocationExpression(
                     SyntaxFactory.MemberBindingExpression(
-                        SyntaxFactory.IdentifierName("Dispose")))));
-
-        // Create finally block with disposal
-        var finallyBlock = SyntaxFactory.FinallyClause(
-            SyntaxFactory.Block(disposeStatement));
-
-        // Create try-finally statement
-        var tryFinally = SyntaxFactory.TryStatement()
-            .WithBlock(SyntaxFactory.Block(tryStatements))
-            .WithFinally(finallyBlock)
+                        SyntaxFactory.IdentifierName("Dispose")))))
             .WithAdditionalAnnotations(Formatter.Annotation);
+    }
 
-        // Build new method body: keep statements up to and including declaration, then add try-finally
-        var newStatements = methodBody.Statements
-            .Take(declarationIndex + 1)
-            .Append(tryFinally)
-            .ToArray();
+    private static bool IsDisposeStatement(StatementSyntax statement, string variableName)
+    {
+        if (statement is not ExpressionStatementSyntax exprStmt)
+            return false;
 
-        var newBody = SyntaxFactory.Block(newStatements);
-        var newMethod = methodDeclaration.WithBody(newBody);
+        return IsDisposeInvocation(exprStmt.Expression, variableName);
+    }
 
-        var newRoot = root.ReplaceNode(methodDeclaration, newMethod);
-        return document.WithSyntaxRoot(newRoot);
+    private static bool IsDisposeInvocation(ExpressionSyntax expression, string variableName)
+    {
+        switch (expression)
+        {
+            case ConditionalAccessExpressionSyntax conditional
+                when conditional.Expression is IdentifierNameSyntax identifier &&
+                     identifier.Identifier.Text == variableName &&
+                     conditional.WhenNotNull is InvocationExpressionSyntax invocation &&
+                     invocation.Expression is MemberBindingExpressionSyntax memberBinding &&
+                     memberBinding.Name.Identifier.Text == "Dispose":
+                return true;
+
+            case InvocationExpressionSyntax invocation
+                when invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                     memberAccess.Expression is IdentifierNameSyntax identifierName &&
+                     identifierName.Identifier.Text == variableName &&
+                     memberAccess.Name.Identifier.Text == "Dispose":
+                return true;
+        }
+
+        return false;
+    }
+
+    private static TryStatementSyntax CleanCatchClauses(TryStatementSyntax tryStatement, string variableName)
+    {
+        if (!tryStatement.Catches.Any())
+            return tryStatement;
+
+        var updatedCatches = new List<CatchClauseSyntax>();
+        foreach (var catchClause in tryStatement.Catches)
+        {
+            if (catchClause.Block == null)
+            {
+                updatedCatches.Add(catchClause);
+                continue;
+            }
+
+            var remainingStatements = catchClause.Block.Statements
+                .Where(stmt => !IsDisposeStatement(stmt, variableName))
+                .ToList();
+
+            if (remainingStatements.Count == catchClause.Block.Statements.Count)
+            {
+                updatedCatches.Add(catchClause);
+                continue;
+            }
+
+            var newBlock = catchClause.Block.WithStatements(SyntaxFactory.List(remainingStatements));
+            updatedCatches.Add(catchClause.WithBlock(newBlock));
+        }
+
+        return tryStatement.WithCatches(SyntaxFactory.List(updatedCatches));
     }
 }

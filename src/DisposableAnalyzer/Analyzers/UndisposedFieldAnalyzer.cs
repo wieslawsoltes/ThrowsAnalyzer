@@ -17,12 +17,12 @@ public class UndisposedFieldAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.UndisposedField,
-        title: "Disposable field not disposed in type",
-        messageFormat: "Field '{0}' implements IDisposable but is not disposed. Type should implement IDisposable and call field.Dispose()",
+        title: "Disposable field is not disposed",
+        messageFormat: "Field '{0}' is not disposed by type '{1}'",
         category: "Resource Management",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "Types with disposable fields should implement IDisposable and dispose the fields in the Dispose method.");
+        description: "Types with disposable fields should implement IDisposable and ensure those fields are disposed.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -97,10 +97,12 @@ public class UndisposedFieldAnalyzer : DiagnosticAnalyzer
             // Type implements IDisposable but has no Dispose method
             foreach (var field in disposableFields)
             {
+                var location = field.Locations.FirstOrDefault() ?? namedType.Locations.FirstOrDefault();
                 var diagnostic = Diagnostic.Create(
                     Rule,
-                    field.Locations.FirstOrDefault(),
-                    field.Name);
+                    location,
+                    field.Name,
+                    namedType.Name);
                 context.ReportDiagnostic(diagnostic);
             }
             return;
@@ -120,10 +122,12 @@ public class UndisposedFieldAnalyzer : DiagnosticAnalyzer
         {
             if (!disposedFields.Contains(field))
             {
+                var location = field.Locations.FirstOrDefault() ?? namedType.Locations.FirstOrDefault();
                 var diagnostic = Diagnostic.Create(
                     Rule,
-                    field.Locations.FirstOrDefault(),
-                    field.Name);
+                    location,
+                    field.Name,
+                    namedType.Name);
                 context.ReportDiagnostic(diagnostic);
             }
         }

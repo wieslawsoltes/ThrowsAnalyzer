@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -8,6 +10,8 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DisposableAnalyzer.CodeFixes;
 
@@ -34,70 +38,135 @@ public class AddExceptionSafetyCodeFixProvider : CodeFixProvider
         var diagnostic = context.Diagnostics.First();
         var diagnosticSpan = diagnostic.Location.SourceSpan;
 
-        var localDeclaration = root.FindToken(diagnosticSpan.Start)
+        var constructor = root.FindToken(diagnosticSpan.Start)
             .Parent?
             .AncestorsAndSelf()
-            .OfType<LocalDeclarationStatementSyntax>()
+            .OfType<ConstructorDeclarationSyntax>()
             .FirstOrDefault();
 
-        if (localDeclaration == null) return;
+        if (constructor?.Body == null) return;
 
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: Title,
-                createChangedDocument: c => AddTryFinallyAsync(context.Document, localDeclaration, c),
+                createChangedDocument: c => AddTryCatchAsync(context.Document, constructor, c),
                 equivalenceKey: Title),
             diagnostic);
     }
 
-    private async Task<Document> AddTryFinallyAsync(
+    private async Task<Document> AddTryCatchAsync(
         Document document,
-        LocalDeclarationStatementSyntax localDeclaration,
+        ConstructorDeclarationSyntax constructor,
         CancellationToken cancellationToken)
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         if (root == null) return document;
 
-        // Get the variable name
-        var variable = localDeclaration.Declaration.Variables.FirstOrDefault();
-        if (variable == null) return document;
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        if (semanticModel == null) return document;
 
-        var variableName = variable.Identifier.Text;
+        var assignedFields = new List<string>();
+        var seen = new HashSet<string>();
 
-        // Find constructor body
-        var constructor = localDeclaration.FirstAncestorOrSelf<ConstructorDeclarationSyntax>();
-        if (constructor?.Body == null) return document;
+        foreach (var statement in constructor.Body.Statements)
+        {
+            var fieldName = TryGetDisposableFieldName(statement, semanticModel, cancellationToken);
+            if (string.IsNullOrEmpty(fieldName))
+            {
+                continue;
+            }
 
-        // Get statements after the local declaration
-        var statements = constructor.Body.Statements;
-        var declarationIndex = statements.IndexOf(localDeclaration);
-        if (declarationIndex == -1) return document;
+            if (seen.Add(fieldName))
+            {
+                assignedFields.Add(fieldName);
+            }
+        }
 
-        // Create try-finally block
-        var tryBlock = SyntaxFactory.Block(
-            statements.Skip(declarationIndex + 1)
-        );
+        if (assignedFields.Count == 0)
+        {
+            return document;
+        }
 
-        var finallyBlock = SyntaxFactory.FinallyClause(
-            SyntaxFactory.Block(
-                SyntaxFactory.ParseStatement($"{variableName}?.Dispose();")
-            )
-        );
-
-        var tryFinally = SyntaxFactory.TryStatement(tryBlock, default, finallyBlock);
-
-        // Rebuild constructor body
-        var newStatements = statements.Take(declarationIndex + 1)
-            .Append(tryFinally)
-            .ToList();
+        var tryStatement = SyntaxFactory.TryStatement(
+            SyntaxFactory.Block(constructor.Body.Statements),
+            SyntaxFactory.SingletonList(
+                SyntaxFactory.CatchClause()
+                    .WithBlock(CreateCatchBlock(assignedFields))),
+            null)
+        .WithAdditionalAnnotations(SyntaxAnnotation.ElasticAnnotation);
 
         var newBody = constructor.Body.WithStatements(
-            SyntaxFactory.List(newStatements)
-        );
+            SyntaxFactory.SingletonList<StatementSyntax>(tryStatement));
 
-        var newConstructor = constructor.WithBody(newBody);
+        var newConstructor = constructor.WithBody(newBody)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+
         var newRoot = root.ReplaceNode(constructor, newConstructor);
-
         return document.WithSyntaxRoot(newRoot);
+    }
+
+    private static string? TryGetDisposableFieldName(
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var operation = semanticModel.GetOperation(statement, cancellationToken);
+        if (operation is not IExpressionStatementOperation expressionStatement)
+        {
+            return null;
+        }
+
+        if (expressionStatement.Operation is not ISimpleAssignmentOperation assignment)
+        {
+            return null;
+        }
+
+        if (assignment.Target is not IFieldReferenceOperation fieldReference)
+        {
+            return null;
+        }
+
+        if (!IsDisposable(fieldReference.Field.Type))
+        {
+            return null;
+        }
+
+        return fieldReference.Field.Name;
+    }
+
+    private static BlockSyntax CreateCatchBlock(IEnumerable<string?> fieldNames)
+    {
+        var disposeStatements = fieldNames
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => CreateDisposeStatement(name!))
+            .ToList();
+
+        disposeStatements.Add(
+            SyntaxFactory.ThrowStatement()
+                .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed)
+                .WithAdditionalAnnotations(Formatter.Annotation));
+
+        return SyntaxFactory.Block(disposeStatements)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+    }
+
+    private static StatementSyntax CreateDisposeStatement(string fieldName)
+    {
+        var identifier = SyntaxFactory.IdentifierName(fieldName);
+        var disposeInvocation = SyntaxFactory.InvocationExpression(
+            SyntaxFactory.MemberBindingExpression(SyntaxFactory.IdentifierName("Dispose")),
+            SyntaxFactory.ArgumentList());
+
+        var expression = SyntaxFactory.ConditionalAccessExpression(identifier, disposeInvocation);
+
+        return SyntaxFactory.ExpressionStatement(expression)
+            .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+    }
+
+    private static bool IsDisposable(ITypeSymbol type)
+    {
+        return type.SpecialType == SpecialType.System_IDisposable ||
+               type.AllInterfaces.Any(i => i.SpecialType == SpecialType.System_IDisposable);
     }
 }

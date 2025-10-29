@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
 
 namespace DisposableAnalyzer.CodeFixes;
 
@@ -60,49 +61,113 @@ public class ConvertToAwaitUsingCodeFixProvider : CodeFixProvider
         if (root == null)
             return document;
 
-        // Add await keyword to using statement
-        var awaitUsing = usingStatement.WithAwaitKeyword(
-            SyntaxFactory.Token(SyntaxKind.AwaitKeyword)
-                .WithTrailingTrivia(SyntaxFactory.Space));
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        if (semanticModel == null)
+            return document;
 
-        // Also need to ensure the containing method is async
         var containingMethod = usingStatement.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
-        if (containingMethod != null && !containingMethod.Modifiers.Any(SyntaxKind.AsyncKeyword))
+
+        var nodesToTrack = containingMethod != null
+            ? new SyntaxNode[] { usingStatement, containingMethod }
+            : new SyntaxNode[] { usingStatement };
+
+        var trackedRoot = root.TrackNodes(nodesToTrack);
+
+        if (containingMethod != null)
         {
-            // Add async modifier to method
-            var asyncModifier = SyntaxFactory.Token(SyntaxKind.AsyncKeyword)
-                .WithTrailingTrivia(SyntaxFactory.Space);
-
-            var newModifiers = containingMethod.Modifiers.Add(asyncModifier);
-            var asyncMethod = containingMethod.WithModifiers(newModifiers);
-
-            // Update return type if needed (void -> Task, T -> Task<T>)
-            var returnType = containingMethod.ReturnType;
-            TypeSyntax newReturnType;
-
-            if (returnType.ToString() == "void")
+            var trackedMethod = trackedRoot.GetCurrentNode(containingMethod);
+            if (trackedMethod != null && !trackedMethod.Modifiers.Any(SyntaxKind.AsyncKeyword))
             {
-                newReturnType = SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task");
-            }
-            else if (!returnType.ToString().StartsWith("Task"))
-            {
-                newReturnType = SyntaxFactory.GenericName(
-                    SyntaxFactory.Identifier("Task"),
-                    SyntaxFactory.TypeArgumentList(
-                        SyntaxFactory.SingletonSeparatedList(returnType)));
-            }
-            else
-            {
-                newReturnType = returnType;
-            }
+                var asyncModifier = SyntaxFactory.Token(SyntaxKind.AsyncKeyword)
+                    .WithTrailingTrivia(SyntaxFactory.Space);
 
-            asyncMethod = asyncMethod.WithReturnType(newReturnType);
+                var asyncMethod = trackedMethod.WithModifiers(trackedMethod.Modifiers.Add(asyncModifier));
 
-            var newRoot = root.ReplaceNode(containingMethod, asyncMethod);
-            root = newRoot;
+                var returnTypeSymbol = semanticModel.GetTypeInfo(containingMethod.ReturnType, cancellationToken).Type;
+                var updatedReturnType = GetUpdatedReturnType(trackedMethod.ReturnType, returnTypeSymbol);
+
+                if (updatedReturnType != null)
+                {
+                    asyncMethod = asyncMethod.WithReturnType(updatedReturnType
+                        .WithTriviaFrom(trackedMethod.ReturnType));
+                }
+
+                trackedRoot = trackedRoot.ReplaceNode(trackedMethod, asyncMethod.WithAdditionalAnnotations(Formatter.Annotation));
+            }
         }
 
-        var finalRoot = root.ReplaceNode(usingStatement, awaitUsing);
+        var currentUsing = trackedRoot.GetCurrentNode(usingStatement);
+        if (currentUsing == null)
+        {
+            return document;
+        }
+
+        var awaitUsing = currentUsing.WithAwaitKeyword(
+                SyntaxFactory.Token(SyntaxKind.AwaitKeyword)
+                    .WithTrailingTrivia(SyntaxFactory.Space))
+            .WithAdditionalAnnotations(Formatter.Annotation);
+
+        var finalRoot = trackedRoot.ReplaceNode(currentUsing, awaitUsing);
         return document.WithSyntaxRoot(finalRoot);
+    }
+
+    private static TypeSyntax? GetUpdatedReturnType(TypeSyntax originalReturnType, ITypeSymbol? returnTypeSymbol)
+    {
+        if (returnTypeSymbol == null)
+        {
+            if (originalReturnType is PredefinedTypeSyntax predefined && predefined.Keyword.IsKind(SyntaxKind.VoidKeyword))
+            {
+                return SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task");
+            }
+
+            var returnTypeText = originalReturnType.ToString();
+            if (IsTaskLike(returnTypeText))
+            {
+                return null;
+            }
+
+            return SyntaxFactory.GenericName(
+                SyntaxFactory.Identifier("Task"),
+                SyntaxFactory.TypeArgumentList(
+                    SyntaxFactory.SingletonSeparatedList(originalReturnType.WithoutTrivia())));
+        }
+
+        if (returnTypeSymbol.SpecialType == SpecialType.System_Void)
+        {
+            return SyntaxFactory.ParseTypeName("System.Threading.Tasks.Task");
+        }
+
+        if (IsTaskLike(returnTypeSymbol))
+        {
+            return null;
+        }
+
+        return SyntaxFactory.GenericName(
+            SyntaxFactory.Identifier("Task"),
+            SyntaxFactory.TypeArgumentList(
+                SyntaxFactory.SingletonSeparatedList(originalReturnType.WithoutTrivia())));
+    }
+
+    private static bool IsTaskLike(ITypeSymbol symbol)
+    {
+        if (symbol is INamedTypeSymbol named)
+        {
+            var name = named.Name;
+            var @namespace = named.ContainingNamespace?.ToDisplayString();
+            if ((name == "Task" || name == "ValueTask") && @namespace == "System.Threading.Tasks")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsTaskLike(string returnTypeText)
+    {
+        return returnTypeText.StartsWith("Task")
+               || returnTypeText.StartsWith("System.Threading.Tasks.Task")
+               || returnTypeText.StartsWith("ValueTask")
+               || returnTypeText.StartsWith("System.Threading.Tasks.ValueTask");
     }
 }

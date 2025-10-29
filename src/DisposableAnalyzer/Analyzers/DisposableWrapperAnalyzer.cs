@@ -16,7 +16,7 @@ public class DisposableWrapperAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.DisposableWrapper,
         title: "Wrapper class should implement IDisposable",
-        messageFormat: "Type '{0}' wraps disposable '{1}' but doesn't implement IDisposable. Consider implementing IDisposable and disposing the wrapped object",
+        messageFormat: "Wrapper class '{0}' should implement IDisposable and dispose the wrapped resource",
         category: "Design",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
@@ -56,14 +56,12 @@ public class DisposableWrapperAnalyzer : DiagnosticAnalyzer
         if (disposableFields.Count != 1)
             return;
 
-        // Check if this looks like a wrapper (has methods that use the field)
         var field = disposableFields[0];
-        var hasMethodsUsingField = namedType.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Count(m => m.MethodKind == MethodKind.Ordinary) > 2; // More than just ctor
 
-        if (!hasMethodsUsingField)
-            return;
+        // Check if constructor suggests ownership is transferred
+        var wrapsOwnInstance = namedType.InstanceConstructors
+            .Where(c => !c.IsImplicitlyDeclared)
+            .Any(ctor => ctor.Parameters.Any(p => SymbolEqualityComparer.Default.Equals(p.Type, field.Type)));
 
         // Check if class name suggests wrapping
         var className = namedType.Name;
@@ -74,13 +72,12 @@ public class DisposableWrapperAnalyzer : DiagnosticAnalyzer
                            className.EndsWith("Manager") ||
                            className.EndsWith("Handler");
 
-        if (isWrapperName || disposableFields.Count == 1)
+        if (isWrapperName && wrapsOwnInstance)
         {
             var diagnostic = Diagnostic.Create(
                 Rule,
                 namedType.Locations.FirstOrDefault(),
-                namedType.Name,
-                field.Type.Name);
+                namedType.Name);
             context.ReportDiagnostic(diagnostic);
         }
     }

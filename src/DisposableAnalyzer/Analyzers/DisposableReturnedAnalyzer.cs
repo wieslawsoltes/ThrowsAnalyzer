@@ -41,10 +41,6 @@ public class DisposableReturnedAnalyzer : DiagnosticAnalyzer
         if (method.MethodKind != MethodKind.Ordinary)
             return;
 
-        // Skip private methods (disposal responsibility is internal)
-        if (method.DeclaredAccessibility == Accessibility.Private)
-            return;
-
         // Check if return type implements IDisposable
         if (!DisposableHelper.IsAnyDisposableType(method.ReturnType))
             return;
@@ -81,10 +77,6 @@ public class DisposableReturnedAnalyzer : DiagnosticAnalyzer
     private void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
-
-        // Skip private properties (disposal responsibility is internal)
-        if (property.DeclaredAccessibility == Accessibility.Private)
-            return;
 
         // Check if property type implements IDisposable
         if (!DisposableHelper.IsAnyDisposableType(property.Type))

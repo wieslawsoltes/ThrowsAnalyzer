@@ -16,9 +16,14 @@ public class ConvertToAwaitUsingCodeFixProviderTests
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -36,9 +41,14 @@ class TestClass
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -53,7 +63,7 @@ class TestClass
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.AsyncDisposableNotUsed)
-            .WithLocation(14, 15)
+            .WithSpan(19, 9, 19, 14)
             .WithArguments("AsyncResource");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
@@ -66,9 +76,14 @@ class TestClass
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -86,9 +101,14 @@ class TestClass
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -103,7 +123,7 @@ class TestClass
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.AsyncDisposableNotUsed)
-            .WithLocation(14, 15)
+            .WithSpan(19, 9, 19, 14)
             .WithArguments("AsyncResource");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
@@ -116,9 +136,14 @@ class TestClass
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -136,9 +161,14 @@ class TestClass
 using System;
 using System.Threading.Tasks;
 
-class AsyncResource : IAsyncDisposable
+class AsyncResource : IAsyncDisposable, IDisposable
 {
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public void Dispose()
+    {
+        // Synchronous disposal fallback
+    }
+
+    public ValueTask DisposeAsync() => default;
 }
 
 class TestClass
@@ -153,7 +183,7 @@ class TestClass
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.AsyncDisposableNotUsed)
-            .WithLocation(14, 15)
+            .WithSpan(19, 9, 19, 14)
             .WithArguments("AsyncResource");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);

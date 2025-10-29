@@ -34,12 +34,15 @@ namespace RoslynAnalyzer.Core.ControlFlow
                 {
                     // Find the root operation (method/constructor body)
                     var root = GetRootOperation(operation);
-                    if (root is IBlockOperation blockOp)
-                    {
-                        var cfg = ControlFlowGraph.Create(blockOp);
-                        _cfgCache[operation] = cfg;
-                        return cfg;
-                    }
+                    if (root is null)
+                        return null;
+
+                    var cfg = CreateControlFlowGraph(root);
+                    if (cfg is null)
+                        return null;
+
+                    _cfgCache[operation] = cfg;
+                    return cfg;
                 }
                 catch
                 {
@@ -47,6 +50,21 @@ namespace RoslynAnalyzer.Core.ControlFlow
                 }
 
                 return null;
+            }
+        }
+
+        private static ControlFlowGraph? CreateControlFlowGraph(IOperation root)
+        {
+            switch (root)
+            {
+                case IBlockOperation blockOperation:
+                    return ControlFlowGraph.Create(blockOperation);
+                case IMethodBodyOperation methodBody when methodBody.BlockBody is IBlockOperation methodBlock:
+                    return ControlFlowGraph.Create(methodBlock);
+                case IConstructorBodyOperation ctorBody when ctorBody.BlockBody is IBlockOperation ctorBlock:
+                    return ControlFlowGraph.Create(ctorBlock);
+                default:
+                    return null;
             }
         }
 

@@ -87,21 +87,17 @@ public class DisposableCollectionCleanupCodeFixProvider : CodeFixProvider
 
         if (disposeMethod != null)
         {
-            // Add disposal loop to existing Dispose method
             var newMethod = AddDisposalLoopToMethod(disposeMethod, fieldName);
             var newTypeDeclaration = typeDeclaration.ReplaceNode(disposeMethod, newMethod);
             var newRoot = root.ReplaceNode(typeDeclaration, newTypeDeclaration);
             return document.WithSyntaxRoot(newRoot);
         }
-        else
-        {
-            // Create new Dispose method with disposal loop
-            var newMethod = CreateDisposeMethodWithLoop(fieldName);
-            var newTypeDeclaration = typeDeclaration.AddMembers(newMethod)
-                .WithAdditionalAnnotations(Formatter.Annotation);
-            var newRoot = root.ReplaceNode(typeDeclaration, newTypeDeclaration);
-            return document.WithSyntaxRoot(newRoot);
-        }
+
+        var createdMethod = CreateDisposeMethodWithLoop(fieldName)
+            .WithAdditionalAnnotations(Formatter.Annotation);
+        var updatedType = typeDeclaration.AddMembers(createdMethod);
+        var updatedRoot = root.ReplaceNode(typeDeclaration, updatedType);
+        return document.WithSyntaxRoot(updatedRoot);
     }
 
     private MethodDeclarationSyntax AddDisposalLoopToMethod(
@@ -112,12 +108,8 @@ public class DisposableCollectionCleanupCodeFixProvider : CodeFixProvider
         if (body == null)
             return method;
 
-        // Create disposal loop
         var disposalLoop = CreateDisposalLoop(fieldName);
-
-        // Add to beginning of method
-        var newBody = body.WithStatements(
-            body.Statements.Insert(0, disposalLoop));
+        var newBody = body.WithStatements(body.Statements.Add(disposalLoop));
 
         return method.WithBody(newBody)
             .WithAdditionalAnnotations(Formatter.Annotation);
@@ -150,7 +142,8 @@ public class DisposableCollectionCleanupCodeFixProvider : CodeFixProvider
                 SyntaxFactory.IdentifierName("item"),
                 SyntaxFactory.InvocationExpression(
                     SyntaxFactory.MemberBindingExpression(
-                        SyntaxFactory.IdentifierName("Dispose")))));
+                        SyntaxFactory.IdentifierName("Dispose")))))
+            .WithAdditionalAnnotations(Formatter.Annotation);
 
         var foreachLoop = SyntaxFactory.ForEachStatement(
             SyntaxFactory.IdentifierName("var"),
@@ -158,21 +151,14 @@ public class DisposableCollectionCleanupCodeFixProvider : CodeFixProvider
             SyntaxFactory.IdentifierName(fieldName),
             SyntaxFactory.Block(disposeStatement));
 
-        var clearStatement = SyntaxFactory.ExpressionStatement(
-            SyntaxFactory.InvocationExpression(
-                SyntaxFactory.MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
-                    SyntaxFactory.IdentifierName(fieldName),
-                    SyntaxFactory.IdentifierName("Clear"))));
-
         var ifStatement = SyntaxFactory.IfStatement(
             SyntaxFactory.BinaryExpression(
                 SyntaxKind.NotEqualsExpression,
                 SyntaxFactory.IdentifierName(fieldName),
                 SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)),
-            SyntaxFactory.Block(foreachLoop, clearStatement));
+            SyntaxFactory.Block(foreachLoop));
 
-        return ifStatement;
+        return ifStatement.WithAdditionalAnnotations(Formatter.Annotation);
     }
 
     private string? ExtractFieldNameFromDiagnostic(Diagnostic diagnostic)

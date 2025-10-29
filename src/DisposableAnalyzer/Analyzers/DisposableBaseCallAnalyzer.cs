@@ -47,7 +47,14 @@ public class DisposableBaseCallAnalyzer : DiagnosticAnalyzer
 
         // Check if this type has a disposable base class
         var containingType = method.ContainingType;
-        if (!DisposableHelper.HasDisposableBase(containingType))
+        var baseType = containingType.BaseType;
+        if (baseType == null)
+            return;
+
+        var baseImplementsDisposal = DisposableHelper.IsAnyDisposableType(baseType) ||
+                                      baseType.GetMembers("Dispose").OfType<IMethodSymbol>().Any();
+
+        if (!baseImplementsDisposal)
             return;
 
         var hasBaseCall = false;
@@ -57,15 +64,12 @@ public class DisposableBaseCallAnalyzer : DiagnosticAnalyzer
             if (operationContext.Operation is IInvocationOperation invocation)
             {
                 // Check for base.Dispose() or base.Dispose(disposing) call
-                if (invocation.Instance is IInstanceReferenceOperation instanceRef &&
-                    instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
+                var targetMethod = invocation.TargetMethod;
+                if (targetMethod.Name == "Dispose" &&
+                    baseType != null &&
+                    SymbolEqualityComparer.Default.Equals(targetMethod.ContainingType, baseType))
                 {
-                    var targetMethod = invocation.TargetMethod;
-                    if (targetMethod.Name == "Dispose" &&
-                        !SymbolEqualityComparer.Default.Equals(targetMethod.ContainingType, containingType))
-                    {
-                        hasBaseCall = true;
-                    }
+                    hasBaseCall = true;
                 }
             }
         }, OperationKind.Invocation);

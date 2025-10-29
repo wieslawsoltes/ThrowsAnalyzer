@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
 
 namespace DisposableAnalyzer.CodeFixes;
 
@@ -100,12 +101,15 @@ public class WrapInUsingCodeFixProvider : CodeFixProvider
             .ToList();
 
         // Create using statement
+        var declaration = localDeclaration.Declaration.WithoutLeadingTrivia();
+
         var usingStatement = SyntaxFactory.UsingStatement(
-            declaration: localDeclaration.Declaration,
+            declaration: declaration,
             expression: null,
             statement: SyntaxFactory.Block(remainingStatements))
             .WithLeadingTrivia(localDeclaration.GetLeadingTrivia())
-            .WithTrailingTrivia(localDeclaration.GetTrailingTrivia());
+            .WithTrailingTrivia(localDeclaration.GetTrailingTrivia())
+            .WithAdditionalAnnotations(Formatter.Annotation);
 
         // Create new block with using statement
         var newStatements = block.Statements
@@ -113,10 +117,11 @@ public class WrapInUsingCodeFixProvider : CodeFixProvider
             .Append(usingStatement)
             .ToList();
 
-        var newBlock = block.WithStatements(SyntaxFactory.List(newStatements));
+    var newBlock = block.WithStatements(SyntaxFactory.List(newStatements));
 
-        var newRoot = root.ReplaceNode(block, newBlock);
-        return document.WithSyntaxRoot(newRoot);
+    var newRoot = root.ReplaceNode(block, newBlock);
+    var formattedRoot = Formatter.Format(newRoot, Formatter.Annotation, document.Project.Solution.Workspace);
+    return document.WithSyntaxRoot(formattedRoot);
     }
 
     private async Task<Document> UseUsingDeclarationAsync(
@@ -139,9 +144,13 @@ public class WrapInUsingCodeFixProvider : CodeFixProvider
         // Add 'using' modifier to the declaration
         var usingDeclaration = localDeclaration
             .WithUsingKeyword(SyntaxFactory.Token(SyntaxKind.UsingKeyword)
-                .WithTrailingTrivia(SyntaxFactory.Space));
+                .WithTrailingTrivia(SyntaxFactory.Space))
+            .WithLeadingTrivia(localDeclaration.GetLeadingTrivia())
+            .WithTrailingTrivia(localDeclaration.GetTrailingTrivia())
+            .WithAdditionalAnnotations(Formatter.Annotation);
 
         var newRoot = root.ReplaceNode(localDeclaration, usingDeclaration);
-        return document.WithSyntaxRoot(newRoot);
+        var formattedRoot = Formatter.Format(newRoot, Formatter.Annotation, document.Project.Solution.Workspace);
+        return document.WithSyntaxRoot(formattedRoot);
     }
 }

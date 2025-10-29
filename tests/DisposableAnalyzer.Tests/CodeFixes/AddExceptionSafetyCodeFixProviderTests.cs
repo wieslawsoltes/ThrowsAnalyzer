@@ -47,6 +47,7 @@ class TestClass
         catch
         {
             _stream1?.Dispose();
+            _stream2?.Dispose();
             throw;
         }
     }

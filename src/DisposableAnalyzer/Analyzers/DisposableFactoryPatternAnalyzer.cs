@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -7,20 +8,21 @@ using DisposableAnalyzer.Helpers;
 namespace DisposableAnalyzer.Analyzers;
 
 /// <summary>
-/// Analyzer that validates factory method naming for disposable returns.
-/// DISP027: Factory method disposal responsibility
+/// Analyzer that ensures factory methods returning disposable instances
+/// clearly document the caller's disposal responsibilities.
+/// DISP027: Factory method disposal responsibility.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class DisposableFactoryPatternAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.DisposableFactoryPattern,
-        title: "Factory method should use clear naming for disposal ownership",
-        messageFormat: "Method '{0}' returns IDisposable. Consider naming it 'Create{0}' to indicate caller owns disposal",
-        category: "Design",
-        defaultSeverity: DiagnosticSeverity.Info,
+        title: "Factory method should document disposal ownership",
+        messageFormat: "Method '{0}' returns a disposable type but XML documentation does not describe caller disposal responsibility",
+        category: "Documentation",
+        defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "Factory methods returning disposables should use naming conventions (Create*, Build*, Make*) to indicate the caller is responsible for disposal.");
+        description: "Factory methods that create disposable instances should document that the caller must dispose the returned value.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -32,48 +34,52 @@ public class DisposableFactoryPatternAnalyzer : DiagnosticAnalyzer
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
     }
 
-    private void AnalyzeMethod(SymbolAnalysisContext context)
+    private static void AnalyzeMethod(SymbolAnalysisContext context)
     {
-        var method = (IMethodSymbol)context.Symbol;
+        if (context.Symbol is not IMethodSymbol method)
+            return;
 
-        // Skip special methods
         if (method.MethodKind != MethodKind.Ordinary)
             return;
 
-        // Skip private/internal methods
-        if (method.DeclaredAccessibility != Accessibility.Public &&
-            method.DeclaredAccessibility != Accessibility.Protected)
+        if (method.ReturnsVoid)
             return;
 
-        // Check if return type is disposable
         if (!DisposableHelper.IsAnyDisposableType(method.ReturnType))
             return;
 
-        var methodName = method.Name;
+        // Skip methods that return the disposable interface directly (self-descriptive)
+        var returnTypeName = method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (returnTypeName is "System.IDisposable" or "System.IAsyncDisposable")
+            return;
 
-        // Check if method has clear factory naming
-        var hasFactoryNaming = methodName.StartsWith("Create") ||
-                              methodName.StartsWith("Build") ||
-                              methodName.StartsWith("Make") ||
-                              methodName.StartsWith("New") ||
-                              methodName.StartsWith("Open") ||
-                              methodName.StartsWith("Initialize");
+        // Only flag accessible factory-like methods
+        if (method.DeclaredAccessibility is not (Accessibility.Public or Accessibility.Protected or Accessibility.Internal or Accessibility.ProtectedOrInternal))
+            return;
 
-        // Check for non-factory naming that might be confusing
-        var hasConfusingNaming = methodName.StartsWith("Get") ||
-                                methodName.StartsWith("Find") ||
-                                methodName.StartsWith("Retrieve") ||
-                                methodName.StartsWith("Fetch");
+        var documentation = method.GetDocumentationCommentXml(
+            preferredCulture: null,
+            expandIncludes: true,
+            cancellationToken: context.CancellationToken);
 
-        if (hasConfusingNaming && !hasFactoryNaming)
+        if (string.IsNullOrWhiteSpace(documentation))
         {
-            // Get* methods with disposable returns are confusing
-            // Did they already exist (Get) or create new (should be Create)?
-            var diagnostic = Diagnostic.Create(
-                Rule,
-                method.Locations.FirstOrDefault(),
-                methodName);
-            context.ReportDiagnostic(diagnostic);
+            Report(context, method);
+            return;
         }
+
+        var hasReturnsElement = documentation.IndexOf("<returns", StringComparison.OrdinalIgnoreCase) >= 0;
+        var mentionsDispose = documentation.IndexOf("dispose", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        if (!hasReturnsElement || !mentionsDispose)
+        {
+            Report(context, method);
+        }
+    }
+
+    private static void Report(SymbolAnalysisContext context, IMethodSymbol method)
+    {
+        var location = method.Locations.FirstOrDefault();
+        context.ReportDiagnostic(Diagnostic.Create(Rule, location, method.Name));
     }
 }

@@ -17,12 +17,12 @@ public class DisposableInConstructorAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.DisposableInConstructor,
-        title: "Exception in constructor with disposable",
-        messageFormat: "Constructor initializes disposable field '{0}' but doesn't handle exceptions. Resources may leak if constructor fails",
-        category: "Reliability",
+        title: "Disposable created in constructor is not disposed",
+        messageFormat: "Disposable '{0}' created in constructor is not stored or disposed",
+        category: "Resource Management",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "When initializing disposable fields in constructors, wrap initialization in try-catch to dispose resources if construction fails.");
+        description: "Disposables created in constructors should either be stored for later disposal or wrapped in a using/try-finally to avoid leaks.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -43,48 +43,182 @@ public class DisposableInConstructorAnalyzer : DiagnosticAnalyzer
         if (method.MethodKind != MethodKind.Constructor)
             return;
 
-        var disposableFieldAssignments = new List<IFieldSymbol>();
-        var hasTryCatch = false;
+        var trackedLocals = new Dictionary<ILocalSymbol, LocalInfo>(SymbolEqualityComparer.Default);
 
         context.RegisterOperationAction(operationContext =>
         {
-            // Track disposable field assignments
-            if (operationContext.Operation is IAssignmentOperation assignment)
+            var creation = (IObjectCreationOperation)operationContext.Operation;
+
+            if (!DisposableHelper.IsAnyDisposableType(creation.Type))
+                return;
+
+            if (DisposableHelper.IsInUsingStatement(creation.Syntax))
+                return;
+
+            if (IsAssignedToInstanceMember(creation))
+                return;
+
+            if (IsPartOfBaseConstructorInitializer(creation))
+                return;
+
+            var local = GetAssignedLocal(creation);
+            if (local != null)
             {
-                if (assignment.Target is IFieldReferenceOperation fieldRef)
+                trackedLocals[local] = new LocalInfo(creation.Syntax.GetLocation());
+            }
+        }, OperationKind.ObjectCreation);
+
+        // Track explicit disposal calls
+        context.RegisterOperationAction(operationContext =>
+        {
+            var operation = operationContext.Operation;
+            if (DisposableHelper.IsDisposalCall(operation, out _))
+            {
+                var local = GetTargetLocal(operation);
+                if (local != null && trackedLocals.TryGetValue(local, out var info))
                 {
-                    if (DisposableHelper.IsAnyDisposableType(fieldRef.Field.Type))
-                    {
-                        // Check if RHS creates a disposable
-                        if (assignment.Value is IObjectCreationOperation)
-                        {
-                            disposableFieldAssignments.Add(fieldRef.Field);
-                        }
-                    }
+                    info.IsDisposed = true;
+                    trackedLocals[local] = info;
                 }
             }
+        }, OperationKind.Invocation, OperationKind.ConditionalAccess);
 
-            // Check for try-catch blocks
-            if (operationContext.Operation is ITryOperation)
+        // Track simple escape scenarios (assignment to field/property or return)
+        context.RegisterOperationAction(operationContext =>
+        {
+            switch (operationContext.Operation)
             {
-                hasTryCatch = true;
+                case IAssignmentOperation assignment:
+                    if (assignment.Value is ILocalReferenceOperation localRef &&
+                        trackedLocals.TryGetValue(localRef.Local, out var info) &&
+                        (assignment.Target is IFieldReferenceOperation or IPropertyReferenceOperation))
+                    {
+                        info.Escapes = true;
+                        trackedLocals[localRef.Local] = info;
+                    }
+                    break;
+
+                case IReturnOperation returnOp:
+                    if (returnOp.ReturnedValue is ILocalReferenceOperation returnedLocal &&
+                        trackedLocals.TryGetValue(returnedLocal.Local, out var info2))
+                    {
+                        info2.Escapes = true;
+                        trackedLocals[returnedLocal.Local] = info2;
+                    }
+                    break;
             }
-        }, OperationKind.SimpleAssignment, OperationKind.Try);
+        }, OperationKind.SimpleAssignment, OperationKind.Return);
 
         context.RegisterOperationBlockEndAction(blockEndContext =>
         {
-            // If we have disposable field assignments and no try-catch, warn
-            if (disposableFieldAssignments.Count > 0 && !hasTryCatch)
+            if (trackedLocals.Count == 0)
+                return;
+
+            foreach (var kvp in trackedLocals)
             {
-                foreach (var field in disposableFieldAssignments)
-                {
-                    var diagnostic = Diagnostic.Create(
-                        Rule,
-                        method.Locations.FirstOrDefault(),
-                        field.Name);
-                    blockEndContext.ReportDiagnostic(diagnostic);
-                }
+                var local = kvp.Key;
+                var info = kvp.Value;
+
+                if (info.IsDisposed || info.Escapes)
+                    continue;
+
+                var diagnostic = Diagnostic.Create(
+                    Rule,
+                    info.Location,
+                    local.Type.Name);
+                blockEndContext.ReportDiagnostic(diagnostic);
             }
         });
+    }
+
+    private static ILocalSymbol? GetAssignedLocal(IObjectCreationOperation creation)
+    {
+        var parent = creation.Parent;
+        while (parent != null)
+        {
+            switch (parent)
+            {
+                case IVariableDeclaratorOperation declarator:
+                    return declarator.Symbol as ILocalSymbol;
+                case IVariableInitializerOperation initializer when initializer.Parent is IVariableDeclaratorOperation declarator:
+                    return declarator.Symbol as ILocalSymbol;
+                case IAssignmentOperation assignment when assignment.Target is ILocalReferenceOperation localRef:
+                    return localRef.Local;
+            }
+            parent = parent.Parent;
+        }
+        return null;
+    }
+
+    private static bool IsAssignedToInstanceMember(IObjectCreationOperation creation)
+    {
+        var parent = creation.Parent;
+        while (parent != null)
+        {
+            if (parent is IAssignmentOperation assignment)
+            {
+                if (assignment.Target is IFieldReferenceOperation fieldRef &&
+                    fieldRef.Instance is IInstanceReferenceOperation)
+                {
+                    return true;
+                }
+
+                if (assignment.Target is IPropertyReferenceOperation propertyRef &&
+                    propertyRef.Instance is IInstanceReferenceOperation)
+                {
+                    return true;
+                }
+            }
+
+            parent = parent.Parent;
+        }
+
+        return false;
+    }
+
+    private static bool IsPartOfBaseConstructorInitializer(IObjectCreationOperation creation)
+    {
+        var parent = creation.Parent;
+        while (parent != null)
+        {
+            if (parent is IArgumentOperation argument &&
+                argument.Parent is IInvocationOperation invocation &&
+                invocation.TargetMethod.MethodKind == MethodKind.Constructor &&
+                invocation.Parent is IConstructorBodyOperation)
+            {
+                return true;
+            }
+            parent = parent.Parent;
+        }
+
+        return false;
+    }
+
+    private static ILocalSymbol? GetTargetLocal(IOperation operation)
+    {
+        switch (operation)
+        {
+            case IInvocationOperation invocation when invocation.Instance is ILocalReferenceOperation localRef:
+                return localRef.Local;
+            case IConditionalAccessOperation conditional when conditional.Operation is ILocalReferenceOperation localRef &&
+                                                              conditional.WhenNotNull is IInvocationOperation:
+                return localRef.Local;
+        }
+
+        return null;
+    }
+
+    private struct LocalInfo
+    {
+        public LocalInfo(Location location)
+        {
+            Location = location;
+            IsDisposed = false;
+            Escapes = false;
+        }
+
+        public Location Location { get; }
+        public bool IsDisposed { get; set; }
+        public bool Escapes { get; set; }
     }
 }

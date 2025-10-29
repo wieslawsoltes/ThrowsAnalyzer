@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using DisposableAnalyzer.Analyzers;
 
 namespace DisposableAnalyzer.CodeFixes;
 
@@ -44,8 +45,7 @@ public class AddSuppressFinalizeCodeFixProvider : CodeFixProvider
         if (methodDeclaration == null) return;
 
         // Check diagnostic message to determine if we need to add or remove
-        var message = diagnostic.GetMessage();
-        if (message.Contains("Missing"))
+        if (diagnostic.Descriptor == SuppressFinalizerPerformanceAnalyzer.MissingCallRule)
         {
             context.RegisterCodeFix(
                 CodeAction.Create(
@@ -54,7 +54,7 @@ public class AddSuppressFinalizeCodeFixProvider : CodeFixProvider
                     equivalenceKey: TitleAdd),
                 diagnostic);
         }
-        else if (message.Contains("Unnecessary"))
+        else if (diagnostic.Descriptor == SuppressFinalizerPerformanceAnalyzer.UnnecessaryCallRule)
         {
             context.RegisterCodeFix(
                 CodeAction.Create(
@@ -75,21 +75,150 @@ public class AddSuppressFinalizeCodeFixProvider : CodeFixProvider
 
         if (methodDeclaration.Body == null) return document;
 
-        // Add GC.SuppressFinalize(this) as the last statement
+        if (ContainsSuppressFinalizeCall(methodDeclaration))
+            return document;
+
+        var body = methodDeclaration.Body;
+        var statements = body.Statements;
+
+        var statementIndent = GetIndentation(statements.LastOrDefault()) ?? "        ";
+        var braceIndent = GetIndentation(body.CloseBraceToken) ?? "    ";
+
+        SyntaxTrivia? commentIndentTrivia = null;
+        SyntaxTrivia? commentTrivia = null;
+        SyntaxTrivia? commentEndOfLineTrivia = null;
+
+        if (statements.Count > 0)
+        {
+            var lastStatement = statements.Last();
+            var trailingTrivia = lastStatement.GetTrailingTrivia();
+            var commentIndex = IndexOfComment(trailingTrivia);
+            if (commentIndex >= 0)
+            {
+                if (commentIndex > 0 && trailingTrivia[commentIndex - 1].IsKind(SyntaxKind.WhitespaceTrivia))
+                {
+                    commentIndentTrivia ??= trailingTrivia[commentIndex - 1];
+                }
+
+                commentTrivia = trailingTrivia[commentIndex];
+
+                var nextIndex = commentIndex + 1;
+                if (nextIndex < trailingTrivia.Count && trailingTrivia[nextIndex].IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    commentEndOfLineTrivia ??= trailingTrivia[nextIndex];
+                }
+
+                var builder = ImmutableArray.CreateBuilder<SyntaxTrivia>();
+                for (int i = 0; i < trailingTrivia.Count; i++)
+                {
+                    if (i == commentIndex)
+                        continue;
+
+                    if (commentIndentTrivia.HasValue && i == commentIndex - 1)
+                        continue;
+
+                    if (commentEndOfLineTrivia.HasValue && i == nextIndex)
+                        continue;
+
+                    builder.Add(trailingTrivia[i]);
+                }
+
+                statements = statements.Replace(
+                    lastStatement,
+                    lastStatement.WithTrailingTrivia(SyntaxFactory.TriviaList(builder.ToImmutable())));
+            }
+        }
+
+        if (commentTrivia is null)
+        {
+            var closeBrace = body.CloseBraceToken;
+            var leadingTrivia = closeBrace.LeadingTrivia;
+            var commentIndex = IndexOfComment(leadingTrivia);
+            if (commentIndex >= 0)
+            {
+                if (commentIndex > 0 && leadingTrivia[commentIndex - 1].IsKind(SyntaxKind.WhitespaceTrivia))
+                {
+                    commentIndentTrivia ??= leadingTrivia[commentIndex - 1];
+                }
+
+                commentTrivia = leadingTrivia[commentIndex];
+
+                SyntaxTrivia? potentialEndOfLine = null;
+                var nextIndex = commentIndex + 1;
+                if (nextIndex < leadingTrivia.Count && leadingTrivia[nextIndex].IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    potentialEndOfLine = leadingTrivia[nextIndex];
+                }
+
+                if (!commentEndOfLineTrivia.HasValue && potentialEndOfLine.HasValue)
+                {
+                    commentEndOfLineTrivia = potentialEndOfLine;
+                }
+
+                var builder = ImmutableArray.CreateBuilder<SyntaxTrivia>();
+                for (int i = 0; i < leadingTrivia.Count; i++)
+                {
+                    if (i == commentIndex)
+                        continue;
+
+                    if (commentIndentTrivia.HasValue && i == commentIndex - 1)
+                        continue;
+
+                    if (potentialEndOfLine.HasValue && i == nextIndex)
+                        continue;
+
+                    builder.Add(leadingTrivia[i]);
+                }
+
+                body = body.WithCloseBraceToken(closeBrace.WithLeadingTrivia(SyntaxFactory.TriviaList(builder.ToImmutable())));
+            }
+        }
+
+        var indentTrivia = SyntaxFactory.Whitespace(statementIndent);
+        var leadingTriviaBuilder = ImmutableArray.CreateBuilder<SyntaxTrivia>();
+
+        if (commentTrivia is SyntaxTrivia commentTriviaValue)
+        {
+            var needsLeadingNewline = statements.Count == 0 ||
+                                      !EndsWithNewLine(statements.Last().GetTrailingTrivia());
+
+            if (needsLeadingNewline)
+            {
+                leadingTriviaBuilder.Add(SyntaxFactory.CarriageReturnLineFeed);
+            }
+
+            var commentIndent = commentIndentTrivia ?? indentTrivia;
+            leadingTriviaBuilder.Add(commentIndent);
+            leadingTriviaBuilder.Add(commentTriviaValue);
+
+            var newlineTrivia = commentEndOfLineTrivia ?? SyntaxFactory.CarriageReturnLineFeed;
+            leadingTriviaBuilder.Add(newlineTrivia);
+
+            leadingTriviaBuilder.Add(indentTrivia);
+        }
+        else
+        {
+            leadingTriviaBuilder.Add(SyntaxFactory.CarriageReturnLineFeed);
+            leadingTriviaBuilder.Add(indentTrivia);
+        }
+
         var suppressStatement = SyntaxFactory.ExpressionStatement(
-            SyntaxFactory.InvocationExpression(
-                SyntaxFactory.MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
-                    SyntaxFactory.IdentifierName("GC"),
-                    SyntaxFactory.IdentifierName("SuppressFinalize")))
-            .AddArgumentListArguments(
-                SyntaxFactory.Argument(SyntaxFactory.ThisExpression())
-            )
-        );
+                SyntaxFactory.InvocationExpression(
+                        SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            SyntaxFactory.IdentifierName("GC"),
+                            SyntaxFactory.IdentifierName("SuppressFinalize")))
+                    .AddArgumentListArguments(
+                        SyntaxFactory.Argument(SyntaxFactory.ThisExpression())))
+            .WithLeadingTrivia(SyntaxFactory.TriviaList(leadingTriviaBuilder.ToImmutable()))
+            .WithTrailingTrivia(SyntaxFactory.TriviaList(SyntaxFactory.CarriageReturnLineFeed));
 
-        var newBody = methodDeclaration.Body.AddStatements(suppressStatement);
-        var newMethod = methodDeclaration.WithBody(newBody);
+        statements = statements.Add(suppressStatement);
+        body = body.WithStatements(statements)
+            .WithCloseBraceToken(body.CloseBraceToken.WithLeadingTrivia(
+                SyntaxFactory.TriviaList(SyntaxFactory.Whitespace(braceIndent))));
 
+        var newMethod = methodDeclaration.WithBody(body);
         var newRoot = root.ReplaceNode(methodDeclaration, newMethod);
         return document.WithSyntaxRoot(newRoot);
     }
@@ -135,5 +264,83 @@ public class AddSuppressFinalizeCodeFixProvider : CodeFixProvider
 
         var newRoot = root.ReplaceNode(methodDeclaration, newMethod);
         return document.WithSyntaxRoot(newRoot);
+    }
+
+    private static bool ContainsSuppressFinalizeCall(MethodDeclarationSyntax method)
+    {
+        return method.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Any(IsSuppressFinalizeInvocation);
+    }
+
+    private static bool IsSuppressFinalizeInvocation(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+            memberAccess.Expression is IdentifierNameSyntax identifier &&
+            identifier.Identifier.Text == "GC" &&
+            memberAccess.Name.Identifier.Text == "SuppressFinalize" &&
+            invocation.ArgumentList.Arguments.Count == 1 &&
+            invocation.ArgumentList.Arguments[0].Expression is ThisExpressionSyntax)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int IndexOfComment(SyntaxTriviaList triviaList)
+    {
+        for (int i = 0; i < triviaList.Count; i++)
+        {
+            if (triviaList[i].IsKind(SyntaxKind.SingleLineCommentTrivia))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool EndsWithNewLine(SyntaxTriviaList trivia)
+    {
+        for (int i = trivia.Count - 1; i >= 0; i--)
+        {
+            if (trivia[i].IsKind(SyntaxKind.EndOfLineTrivia))
+            {
+                return true;
+            }
+
+            if (!trivia[i].IsKind(SyntaxKind.WhitespaceTrivia))
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? GetIndentation(SyntaxNode? node)
+    {
+        if (node == null)
+            return null;
+
+        foreach (var trivia in node.GetLeadingTrivia())
+        {
+            if (trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                return trivia.ToString();
+        }
+
+        return null;
+    }
+
+    private static string? GetIndentation(SyntaxToken token)
+    {
+        foreach (var trivia in token.LeadingTrivia)
+        {
+            if (trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                return trivia.ToString();
+        }
+
+        return null;
     }
 }
