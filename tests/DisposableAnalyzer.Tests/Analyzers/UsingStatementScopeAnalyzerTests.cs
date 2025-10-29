@@ -48,7 +48,7 @@ class TestClass
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.UsingStatementScopeToBroad)
             .WithLocation(0)
-            .WithArguments("stream");
+            .WithArguments("stream", "1", "7");
 
         await VerifyCS.VerifyAnalyzerAsync(code, expected);
     }

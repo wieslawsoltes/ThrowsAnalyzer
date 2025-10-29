@@ -38,7 +38,6 @@ class TestClass : IDisposable
 
     public void Dispose()
     {
-        // Missing disposal of collection items
         if (_streams != null)
         {
             foreach (var item in _streams)
@@ -46,11 +45,12 @@ class TestClass : IDisposable
                 item?.Dispose();
             }
         }
+        // Missing disposal of collection items
     }
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.DisposableCollection)
-            .WithLocation(8, 31)
+            .WithLocation(8, 30)
             .WithArguments("_streams", "TestClass");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
@@ -83,7 +83,6 @@ class TestClass : IDisposable
 
     public void Dispose()
     {
-        // Missing disposal of array items
         if (_streams != null)
         {
             foreach (var item in _streams)
@@ -91,6 +90,7 @@ class TestClass : IDisposable
                 item?.Dispose();
             }
         }
+        // Missing disposal of array items
     }
 }";
 
@@ -134,7 +134,6 @@ class TestClass : IDisposable
     public void Dispose()
     {
         _mainStream?.Dispose();
-        // Missing disposal of collection items
         if (_streams != null)
         {
             foreach (var item in _streams)
@@ -142,11 +141,12 @@ class TestClass : IDisposable
                 item?.Dispose();
             }
         }
+        // Missing disposal of collection items
     }
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.DisposableCollection)
-            .WithLocation(8, 31)
+            .WithLocation(8, 30)
             .WithArguments("_streams", "TestClass");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);

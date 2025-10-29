@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using DisposableAnalyzer.Helpers;
 
 namespace DisposableAnalyzer.Analyzers;
@@ -16,7 +18,7 @@ public class DisposableCollectionAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticIds.DisposableCollection,
         title: "Collection of disposables not disposed",
-        messageFormat: "Field '{0}' is a collection of disposable objects. Ensure all elements are disposed",
+        messageFormat: "Field '{0}' in type '{1}' is a collection of disposable objects. Ensure all elements are disposed",
         category: "Resource Management",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
@@ -50,24 +52,33 @@ public class DisposableCollectionAnalyzer : DiagnosticAnalyzer
 
         // Check if containing type implements IDisposable
         var containingType = field.ContainingType;
-        if (!DisposableHelper.IsDisposableType(containingType) &&
-            !DisposableHelper.IsAsyncDisposableType(containingType))
+        var implementsDisposable =
+            DisposableHelper.IsDisposableType(containingType) ||
+            DisposableHelper.IsAsyncDisposableType(containingType);
+
+        if (implementsDisposable && IsCollectionDisposed(containingType, field, context))
         {
-            // Type doesn't implement IDisposable but has disposable collection - report diagnostic
-            var diagnostic = Diagnostic.Create(
-                Rule,
-                field.Locations.FirstOrDefault(),
-                field.Name);
-            context.ReportDiagnostic(diagnostic);
+            return;
         }
 
-        // If type implements IDisposable, assume developer is handling disposal correctly
-        // TODO: In future, could verify disposal in Dispose method for more thorough checking
+        var diagnostic = Diagnostic.Create(
+            Rule,
+            field.Locations.FirstOrDefault(),
+            field.Name,
+            containingType.Name);
+        context.ReportDiagnostic(diagnostic);
     }
 
     private bool IsCollectionType(ITypeSymbol type, out ITypeSymbol? elementType)
     {
         elementType = null;
+
+        // Array types
+        if (type is IArrayTypeSymbol arrayType)
+        {
+            elementType = arrayType.ElementType;
+            return true;
+        }
 
         if (type is not INamedTypeSymbol namedType)
             return false;
@@ -94,11 +105,105 @@ public class DisposableCollectionAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        // Array types
-        if (type is IArrayTypeSymbol arrayType)
+        return false;
+    }
+
+    private bool IsCollectionDisposed(
+        INamedTypeSymbol containingType,
+        IFieldSymbol field,
+        SymbolAnalysisContext context)
+    {
+        var disposeMethods = GetCandidateDisposeMethods(containingType);
+        if (disposeMethods.Length == 0)
         {
-            elementType = arrayType.ElementType;
-            return true;
+            // No dispose methods defined - treat as not disposed
+            return false;
+        }
+
+        foreach (var disposeMethod in disposeMethods)
+        {
+            foreach (var syntaxRef in disposeMethod.DeclaringSyntaxReferences)
+            {
+                var syntax = syntaxRef.GetSyntax(context.CancellationToken);
+                if (syntax == null)
+                    continue;
+
+                var semanticModel = context.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                if (HasDisposalLoop(syntax, semanticModel, field, context.CancellationToken))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private ImmutableArray<IMethodSymbol> GetCandidateDisposeMethods(INamedTypeSymbol containingType)
+    {
+        var builder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+
+        var disposeMethod = DisposableHelper.GetDisposeMethod(containingType);
+        if (disposeMethod != null)
+        {
+            builder.Add(disposeMethod);
+        }
+
+        var disposeBoolMethod = containingType.GetMembers()
+            .OfType<IMethodSymbol>()
+            .FirstOrDefault(m => DisposableHelper.IsDisposeBoolMethod(m));
+        if (disposeBoolMethod != null)
+        {
+            builder.Add(disposeBoolMethod);
+        }
+
+        var disposeAsyncMethod = DisposableHelper.GetDisposeAsyncMethod(containingType);
+        if (disposeAsyncMethod != null)
+        {
+            builder.Add(disposeAsyncMethod);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private bool HasDisposalLoop(
+        SyntaxNode methodSyntax,
+        SemanticModel semanticModel,
+        IFieldSymbol field,
+        CancellationToken cancellationToken)
+    {
+        foreach (var forEach in methodSyntax.DescendantNodes().OfType<ForEachStatementSyntax>())
+        {
+            var expressionSymbol = semanticModel.GetSymbolInfo(forEach.Expression, cancellationToken).Symbol;
+            var matchesBySymbol = SymbolEqualityComparer.Default.Equals(expressionSymbol, field);
+
+            var matchesByName = forEach.Expression is IdentifierNameSyntax identifier &&
+                                identifier.Identifier.Text == field.Name;
+
+            if (!matchesBySymbol && !matchesByName)
+                continue;
+
+            if (ContainsDisposeInvocation(forEach.Statement, semanticModel, cancellationToken))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ContainsDisposeInvocation(
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        foreach (var invocation in statement.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method)
+            {
+                if (method.Name is "Dispose" or "DisposeAsync" && method.Parameters.Length == 0)
+                {
+                    return true;
+                }
+            }
         }
 
         return false;

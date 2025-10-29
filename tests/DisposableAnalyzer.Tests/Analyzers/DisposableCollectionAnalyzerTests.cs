@@ -29,7 +29,7 @@ class TestClass
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.DisposableCollection)
             .WithLocation(0)
-            .WithArguments("_streams");
+            .WithArguments("_streams", "TestClass");
 
         await VerifyCS.VerifyAnalyzerAsync(code, expected);
     }

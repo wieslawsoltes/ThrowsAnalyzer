@@ -52,7 +52,7 @@ class TestClass
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.UsingStatementScopeToBroad)
             .WithLocation(9, 9)
-            .WithArguments("stream");
+            .WithArguments("stream", "2", "4");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
     }
@@ -100,7 +100,7 @@ class TestClass
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.UsingStatementScopeToBroad)
             .WithLocation(9, 9)
-            .WithArguments("stream");
+            .WithArguments("stream", "1", "5");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
     }

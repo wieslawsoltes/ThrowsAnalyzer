@@ -106,7 +106,7 @@ public class DisposeBoolPatternCodeFixProvider : CodeFixProvider
         newTypeDeclaration = newTypeDeclaration.AddMembers(disposeBoolMethod);
 
         // Add finalizer if needed and not present
-        if (!hasFinalizer && NeedsFinalizer(disposableFields))
+        if (!hasFinalizer && NeedsFinalizer(typeSymbol))
         {
             var finalizer = CreateFinalizer(typeDeclaration.Identifier.Text);
             newTypeDeclaration = newTypeDeclaration.AddMembers(finalizer);
@@ -135,20 +135,17 @@ public class DisposeBoolPatternCodeFixProvider : CodeFixProvider
                                 SyntaxKind.TrueLiteralExpression)))))));
 
         // GC.SuppressFinalize(this);
-        if (hasFinalizer)
-        {
-            statements.Add(SyntaxFactory.ExpressionStatement(
-                SyntaxFactory.InvocationExpression(
-                    SyntaxFactory.MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        SyntaxFactory.IdentifierName("GC"),
-                        SyntaxFactory.IdentifierName("SuppressFinalize")))
-                .WithArgumentList(
-                    SyntaxFactory.ArgumentList(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Argument(
-                                SyntaxFactory.ThisExpression()))))));
-        }
+        statements.Add(SyntaxFactory.ExpressionStatement(
+            SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("GC"),
+                    SyntaxFactory.IdentifierName("SuppressFinalize")))
+            .WithArgumentList(
+                SyntaxFactory.ArgumentList(
+                    SyntaxFactory.SingletonSeparatedList(
+                        SyntaxFactory.Argument(
+                            SyntaxFactory.ThisExpression()))))));
 
         return SyntaxFactory.MethodDeclaration(
             SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
@@ -179,14 +176,25 @@ public class DisposeBoolPatternCodeFixProvider : CodeFixProvider
 
         if (managedStatements.Count > 0)
         {
+            managedStatements[0] = managedStatements[0]
+                .WithLeadingTrivia(
+                    SyntaxFactory.TriviaList(
+                        SyntaxFactory.Comment("// Dispose managed resources"),
+                        SyntaxFactory.ElasticLineFeed));
+
             statements.Add(SyntaxFactory.IfStatement(
                 SyntaxFactory.IdentifierName("disposing"),
                 SyntaxFactory.Block(managedStatements)));
         }
 
-        // Add comment for unmanaged resources
-        // TODO: Free unmanaged resources (unmanaged objects) and override finalizer
-        // TODO: Set large fields to null
+        var body = SyntaxFactory.Block(statements);
+
+        var closeBrace = body.CloseBraceToken;
+        closeBrace = closeBrace.WithLeadingTrivia(
+            SyntaxFactory.TriviaList(
+                SyntaxFactory.Comment("// Dispose unmanaged resources"),
+                SyntaxFactory.ElasticLineFeed).AddRange(closeBrace.LeadingTrivia));
+        body = body.WithCloseBraceToken(closeBrace);
 
         return SyntaxFactory.MethodDeclaration(
             SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
@@ -203,7 +211,7 @@ public class DisposeBoolPatternCodeFixProvider : CodeFixProvider
                 SyntaxFactory.TokenList(
                     SyntaxFactory.Token(SyntaxKind.ProtectedKeyword),
                     SyntaxFactory.Token(SyntaxKind.VirtualKeyword)))
-            .WithBody(SyntaxFactory.Block(statements));
+            .WithBody(body);
     }
 
     private DestructorDeclarationSyntax CreateFinalizer(string typeName)
@@ -226,10 +234,21 @@ public class DisposeBoolPatternCodeFixProvider : CodeFixProvider
                                             SyntaxKind.FalseLiteralExpression))))))));
     }
 
-    private bool NeedsFinalizer(List<IFieldSymbol> disposableFields)
+    private bool NeedsFinalizer(INamedTypeSymbol typeSymbol)
     {
-        // Finalizer is typically only needed if type holds unmanaged resources
-        // For now, we conservatively don't add one unless explicitly needed
+        foreach (var field in typeSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (field.IsStatic)
+                continue;
+
+            var fieldType = field.Type;
+            if (fieldType.SpecialType == SpecialType.System_IntPtr ||
+                fieldType.SpecialType == SpecialType.System_UIntPtr)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 

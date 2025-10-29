@@ -72,9 +72,10 @@ public class DisposeBoolPatternAnalyzer : DiagnosticAnalyzer
             if (disposeMethod != null &&
                 SymbolEqualityComparer.Default.Equals(disposeMethod.ContainingType, namedType))
             {
+                var location = disposeMethod.Locations.FirstOrDefault() ?? namedType.Locations.FirstOrDefault();
                 var diagnostic = Diagnostic.Create(
                     MissingDisposeBoolRule,
-                    namedType.Locations.FirstOrDefault(),
+                    location,
                     namedType.Name);
                 context.ReportDiagnostic(diagnostic);
             }

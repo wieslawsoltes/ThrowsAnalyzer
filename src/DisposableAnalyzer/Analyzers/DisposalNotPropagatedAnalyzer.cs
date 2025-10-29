@@ -66,12 +66,8 @@ public class DisposalNotPropagatedAnalyzer : DiagnosticAnalyzer
             if (disposeLikeMethods.Any(method => MethodDisposesField(method, field, context.CancellationToken)))
                 continue;
 
-            var location = typeSymbol.Locations.FirstOrDefault() ?? field.Locations.FirstOrDefault();
-            var fieldReference = field.DeclaringSyntaxReferences.FirstOrDefault();
-            var fieldLocation = fieldReference != null
-                ? Location.Create(fieldReference.SyntaxTree, fieldReference.Span)
-                : field.Locations.FirstOrDefault() ?? location;
-            context.ReportDiagnostic(Diagnostic.Create(Rule, fieldLocation, field.Name, typeSymbol.Name));
+            var typeLocation = typeSymbol.Locations.FirstOrDefault() ?? field.Locations.FirstOrDefault();
+            context.ReportDiagnostic(Diagnostic.Create(Rule, typeLocation, typeSymbol.Name, field.Name));
         }
     }
 
