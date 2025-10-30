@@ -59,7 +59,7 @@ class TestClass
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.DisposalInAllPaths)
-            .WithSpan(9, 22, 9, 63)
+            .WithLocation(9, 13)
             .WithArguments("stream");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);
@@ -111,7 +111,7 @@ class TestClass
 }";
 
         var expected = VerifyCS.Diagnostic(DiagnosticIds.DisposalInAllPaths)
-            .WithSpan(9, 22, 9, 63)
+            .WithLocation(9, 13)
             .WithArguments("stream");
 
         await VerifyCS.VerifyCodeFixAsync(code, expected, fixedCode);

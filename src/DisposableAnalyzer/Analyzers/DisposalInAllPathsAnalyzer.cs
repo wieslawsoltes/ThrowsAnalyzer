@@ -46,7 +46,7 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
         if (context.OwningSymbol is not IMethodSymbol)
             return;
 
-        var disposableCreations = new List<(ILocalSymbol local, VariableDeclaratorSyntax? declarator)>();
+        var disposableCreations = new List<(ILocalSymbol local, Location identifierLocation)>();
         var localsNeedingFinally = new HashSet<string>();
 
         // Track disposable creations
@@ -61,20 +61,40 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             var localSymbol = GetLocalSymbol(creation);
             if (localSymbol != null)
             {
-                var declaratorSyntax = creation.Syntax.Parent?.Parent as VariableDeclaratorSyntax;
+                var declaratorReference = localSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+                var declaratorSyntax = declaratorReference?.GetSyntax(operationContext.CancellationToken) as VariableDeclaratorSyntax;
 
-                disposableCreations.Add((localSymbol, declaratorSyntax));
+                // Fall back to syntax walk if needed (e.g., for synthesized locals)
+                declaratorSyntax ??= creation.Syntax.Ancestors().OfType<VariableDeclaratorSyntax>().FirstOrDefault();
+
+                Location identifierLocation;
+                if (declaratorSyntax != null)
+                {
+                    var identifierSpan = declaratorSyntax.Identifier.Span;
+                    identifierLocation = Location.Create(declaratorSyntax.SyntaxTree, identifierSpan);
+                }
+                else
+                {
+                    identifierLocation = creation.Syntax.GetLocation();
+                }
+
+                disposableCreations.Add((localSymbol, identifierLocation));
             }
         }, OperationKind.ObjectCreation);
 
         context.RegisterOperationAction(operationContext =>
         {
             var tryOperation = (ITryOperation)operationContext.Operation;
-            var referencedLocals = tryOperation.Descendants()
-                .OfType<ILocalReferenceOperation>()
-                .Select(localRef => localRef.Local)
-                .Where(local => DisposableHelper.IsAnyDisposableType(local.Type))
-                .Distinct(SymbolEqualityComparer.Default);
+            var referencedLocals = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
+
+            foreach (var localRef in tryOperation.Descendants().OfType<ILocalReferenceOperation>())
+            {
+                var local = localRef.Local;
+                if (local != null && DisposableHelper.IsAnyDisposableType(local.Type))
+                {
+                    referencedLocals.Add(local);
+                }
+            }
 
             foreach (var local in referencedLocals)
             {
@@ -92,7 +112,7 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             if (methodOperation == null)
                 return;
 
-            foreach (var (local, declarator) in disposableCreations)
+            foreach (var (local, identifierLocation) in disposableCreations)
             {
                 // Use the comprehensive disposal flow analyzer from core
                 var analysis = _disposalAnalyzer.AnalyzeDisposal(
@@ -103,10 +123,7 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
 
                 if (!analysis.IsDisposedOnAllPaths || localsNeedingFinally.Contains(local.Name))
                 {
-                    var reportLocation = declarator?.Identifier.GetLocation()
-                        ?? FindLocalDeclarator(methodOperation, local)?.Identifier.GetLocation()
-                        ?? local.Locations.FirstOrDefault()
-                        ?? methodOperation.Syntax.GetLocation();
+                    var reportLocation = identifierLocation;
 
                     var diagnostic = Diagnostic.Create(
                         Rule,
@@ -137,13 +154,6 @@ public class DisposalInAllPathsAnalyzer : DiagnosticAnalyzer
             parent = parent.Parent;
         }
         return null;
-    }
-
-    private VariableDeclaratorSyntax? FindLocalDeclarator(IOperation methodOperation, ILocalSymbol local)
-    {
-        return methodOperation.Syntax.DescendantNodes()
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault(v => v.Identifier.Text == local.Name);
     }
 
     private static bool FinallyDisposesLocal(IBlockOperation finallyBlock, ILocalSymbol local)
